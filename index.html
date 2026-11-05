@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Music Sheet to MP3</title>
+<meta name="description" content="Turn a simple PDF music sheet into a melody MP3. Reads the notes, lets you fix them, then plays and exports the MP3 in your browser.">
+<link rel="apple-touch-icon" sizes="180x180" href="music-sheet-to-mp3-icon.png">
+<link rel="icon" href="music-sheet-to-mp3-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Music Sheet to MP3">
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1c2430;--mute:#667085;--line:#e3e6eb;--accent:#2f6fed;--accent-ink:#fff;--warn:#b54708;--ok:#067647}
+  @media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b212a;--ink:#eef1f5;--mute:#98a2b3;--line:#2c3541;--accent:#5b8cff;--accent-ink:#0b1220;--warn:#f79009;--ok:#47cd89}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px 48px}
+  main{max-width:720px;margin:0 auto}
+  h1{font-size:1.45rem;margin:8px 0 4px}
+  .sub{color:var(--mute);margin:0 0 16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+  .card h2{font-size:1rem;margin:0 0 10px}
+  label{display:block;font-size:.9rem;color:var(--mute);margin:10px 0 4px}
+  select,input[type=number],input[type=text]{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:1rem}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button,.btn{appearance:none;border:0;border-radius:12px;padding:13px 16px;font-size:1rem;font-weight:600;background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none;display:inline-block;text-align:center}
+  button.sec{background:transparent;color:var(--accent);border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:default}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .btns>*{flex:1 1 140px}
+  .status{margin:10px 0 0;color:var(--mute);font-size:.92rem;min-height:1.3em}
+  .status.warn{color:var(--warn)} .status.ok{color:var(--ok)}
+  details summary{cursor:pointer;color:var(--accent);margin-top:12px}
+  .pages{margin-top:10px}
+  .pagewrap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:8px 0;background:#fff}
+  .pagewrap canvas{display:block;width:100%;height:auto}
+  .pagewrap canvas.ov{position:absolute;left:0;top:0;pointer-events:none}
+  .note{display:grid;grid-template-columns:28px 78px 1fr 40px 40px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+  .note.sel{background:rgba(47,111,237,.10)}
+  .note .n{color:var(--mute);font-size:.8rem;text-align:right}
+  .note input,.note select{padding:7px;font-size:.95rem}
+  .note button{padding:7px 0;font-size:1rem;border-radius:9px}
+  .small{font-size:.85rem;color:var(--mute)}
+  audio{width:100%;margin-top:10px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Music Sheet to MP3</h1>
+  <p class="sub">Turn a simple PDF music sheet (one melody line) into an MP3. Everything happens on your device.</p>
+
+  <section class="card">
+    <h2>1. Choose your PDF</h2>
+    <input id="file" type="file" accept="application/pdf,.pdf">
+    <div id="status1" class="status"></div>
+  </section>
+
+  <section class="card">
+    <h2>2. Settings</h2>
+    <div class="row2">
+      <div>
+        <label for="clef">Clef / voice</label>
+        <select id="clef">
+          <option value="treble">Treble (normal)</option>
+          <option value="treble8">Treble 8vb (male voice)</option>
+          <option value="bass">Bass</option>
+        </select>
+      </div>
+      <div>
+        <label for="key">Key signature</label>
+        <select id="key">
+          <option value="0">C major / A minor</option>
+          <option value="1">G major (1 sharp)</option>
+          <option value="2">D major (2 sharps)</option>
+          <option value="3">A major (3 sharps)</option>
+          <option value="4">E major (4 sharps)</option>
+          <option value="-1">F major (1 flat)</option>
+          <option value="-2">B♭ major (2 flats)</option>
+          <option value="-3">E♭ major (3 flats)</option>
+          <option value="-4">A♭ major (4 flats)</option>
+        </select>
+      </div>
+    </div>
+    <label for="ts">Time signature</label>
+    <select id="ts">
+      <option value="2">2/4</option>
+      <option value="3">3/4</option>
+      <option value="4">4/4</option>
+      <option value="3">6/8</option>
+      <option value="0">Don't check bars</option>
+    </select>
+    <label for="bpm">Tempo (quarter notes per minute)</label>
+    <input id="bpm" type="number" min="30" max="240" value="90" inputmode="numeric">
+    <details>
+      <summary>More options</summary>
+      <label for="mode">Which staves to read</label>
+      <select id="mode">
+        <option value="all">All staves</option>
+        <option value="odd">1st, 3rd, 5th… (top of each pair)</option>
+        <option value="even">2nd, 4th, 6th… (bottom of each pair)</option>
+      </select>
+      <label for="skip">Skip at the start of each staff (staff spaces, covers clef, key and time signature)</label>
+      <input id="skip" type="number" min="2" max="14" step="0.5" value="7" inputmode="decimal">
+    </details>
+    <div class="btns"><button id="readBtn" disabled>Read the notes</button></div>
+    <div id="status2" class="status"></div>
+  </section>
+
+  <section class="card hidden" id="reviewCard">
+    <h2>3. Check the notes</h2>
+    <p class="small">Blue circles mark what was read. Fix any wrong note below (type a name like C4, F#3, Bb4, or R for a rest), change its length, delete it, or add a rest with ＋.</p>
+    <div id="pages" class="pages"></div>
+    <div id="list"></div>
+    <div class="btns">
+      <button id="playBtn" class="sec">▶ Play</button>
+      <button id="mp3Btn">Make MP3</button>
+    </div>
+    <div id="status3" class="status"></div>
+    <div id="result" class="hidden">
+      <audio id="player" controls></audio>
+      <div class="btns">
+        <a id="dl" class="btn" download="melody.mp3">Download MP3</a>
+        <button id="shareBtn" class="sec hidden">Save / Share</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="small">Works best with clean, computer-made PDFs showing a single melody. It reads note heads, note lengths (including dotted notes and triplets), and the top note of stacked chords. It does not read rests, sharps/flats written beside a note, ties, or repeats and endings (it plays straight through). Fix those in the list.</p>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<script>
+// ==OMR-START==
+const SEMI = [0, 2, 4, 5, 7, 9, 11];
+
+function keyAccidentals(key) {
+  const acc = [0, 0, 0, 0, 0, 0, 0]; // C D E F G A B
+  const sharps = [3, 0, 4, 1, 5, 2, 6];
+  const flats = [6, 2, 5, 1, 4, 0, 3];
+  if (key > 0) for (let i = 0; i < key; i++) acc[sharps[i]] = 1;
+  else for (let i = 0; i < -key; i++) acc[flats[i]] = -1;
+  return acc;
+}
+
+function midiFromDia(dia, acc, shift) {
+  const oct = Math.floor(dia / 7);
+  const li = ((dia % 7) + 7) % 7;
+  return 12 * (oct + 1) + SEMI[li] + acc[li] + shift;
+}
+
+function toBinary(rgba, W, H) {
+  const bin = new Uint8Array(W * H);
+  for (let i = 0, j = 0; i < bin.length; i++, j += 4) {
+    const l = 0.299 * rgba[j] + 0.587 * rgba[j + 1] + 0.114 * rgba[j + 2];
+    bin[i] = l < 150 ? 1 : 0;
+  }
+  return bin;
+}
+
+function findStaves(bin, W, H) {
+  const rc = new Int32Array(H);
+  let max = 0;
+  for (let y = 0; y < H; y++) {
+    let c = 0;
+    const row = y * W;
+    for (let x = 0; x < W; x++) c += bin[row + x];
+    rc[y] = c;
+    if (c > max) max = c;
+  }
+  if (max < 20) return [];
+  const thr = Math.max(0.15 * W, 0.5 * max);
+  const lines = [];
+  let y = 0;
+  while (y < H) {
+    if (rc[y] >= thr) {
+      const s = y;
+      while (y < H && rc[y] >= thr) y++;
+      lines.push({ c: (s + y - 1) / 2, t: y - s, s, e: y - 1 });
+    } else y++;
+  }
+  const staves = [];
+  for (let i = 0; i + 4 < lines.length;) {
+    const g = lines[i + 1].c - lines[i].c;
+    let ok = g > 3;
+    for (let k = 1; k < 4 && ok; k++) {
+      const gg = lines[i + k + 1].c - lines[i + k].c;
+      if (Math.abs(gg - g) > g * 0.2) ok = false;
+    }
+    if (ok) {
+      const ls = lines.slice(i, i + 5);
+      const row = Math.round(ls[0].c) * W;
+      let x0 = -1, x1 = -1;
+      for (let x = 0; x < W; x++) if (bin[row + x]) { if (x0 < 0) x0 = x; x1 = x; }
+      staves.push({
+        top: ls[0].c,
+        d: (ls[4].c - ls[0].c) / 4,
+        t: ls.reduce((a, l) => a + l.t, 0) / 5,
+        x0, x1
+      });
+      i += 5;
+    } else i++;
+  }
+  return staves;
+}
+
+function labelComponents(mask, w, h) {
+  const lab = new Int32Array(w * h);
+  const comps = [];
+  const stack = [];
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i] || lab[i]) continue;
+    const id = comps.length + 1;
+    let sx = 0, sy = 0, n = 0, minx = w, maxx = 0, miny = h, maxy = 0;
+    stack.push(i);
+    lab[i] = id;
+    while (stack.length) {
+      const p = stack.pop();
+      const px = p % w, py = (p - px) / w;
+      sx += px; sy += py; n++;
+      if (px < minx) minx = px; if (px > maxx) maxx = px;
+      if (py < miny) miny = py; if (py > maxy) maxy = py;
+      if (px > 0 && mask[p - 1] && !lab[p - 1]) { lab[p - 1] = id; stack.push(p - 1); }
+      if (px < w - 1 && mask[p + 1] && !lab[p + 1]) { lab[p + 1] = id; stack.push(p + 1); }
+      if (py > 0 && mask[p - w] && !lab[p - w]) { lab[p - w] = id; stack.push(p - w); }
+      if (py < h - 1 && mask[p + w] && !lab[p + w]) { lab[p + w] = id; stack.push(p + w); }
+    }
+    comps.push({ cx: sx / n, cy: sy / n, n, minx, maxx, miny, maxy });
+  }
+  return comps;
+}
+
+function boxFrac(ii, w, h, xa, ya, xb, yb) {
+  let x0 = Math.max(0, Math.round(xa)), y0 = Math.max(0, Math.round(ya));
+  let x1 = Math.min(w, Math.round(xb)), y1 = Math.min(h, Math.round(yb));
+  if (x1 <= x0 || y1 <= y0) return 0;
+  const W1 = w + 1;
+  const s = ii[y1 * W1 + x1] - ii[y0 * W1 + x1] - ii[y1 * W1 + x0] + ii[y0 * W1 + x0];
+  return s / ((x1 - x0) * (y1 - y0));
+}
+
+function stemRun(m, w, h, cx, cy, d, dir) {
+  // dir -1: stem going up on the right of the head; +1: going down on the left.
+  const sideX = cx + (dir < 0 ? 1 : -1) * 0.5 * d;
+  const r = Math.max(2, Math.round(0.2 * d));
+  let best = { n: 0, x: Math.round(sideX), end: Math.round(cy) };
+  for (let dx = -r; dx <= r; dx++) {
+    const x = Math.round(sideX + dx);
+    if (x < 0 || x >= w) continue;
+    let n = 0, gap = 0, yy = Math.round(cy), end = yy;
+    while (yy >= 0 && yy < h) {
+      if (m[yy * w + x]) { n++; gap = 0; end = yy; }
+      else { gap++; if (gap > 2) break; }
+      yy += dir;
+    }
+    if (n > best.n) best = { n, x, end };
+  }
+  return best;
+}
+
+function readStaff(bin, W, H, st, opt) {
+  const d = st.d;
+  const y0 = Math.max(0, Math.round(st.top - 3.5 * d));
+  const y1 = Math.min(H - 1, Math.round(st.top + 7.5 * d));
+  const x0 = Math.max(0, Math.round(st.x0 + opt.skip * d));
+  const x1 = Math.min(W - 1, st.x1);
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  if (w < 4 * d || h < 4 * d) return [];
+  const m = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = (y + y0) * W + x0;
+    for (let x = 0; x < w; x++) m[y * w + x] = bin[row + x];
+  }
+  // Erase staff lines and ledger-line positions where nothing crosses them.
+  const t = Math.max(1, Math.round(st.t));
+  for (let k = -3; k <= 7; k++) {
+    const s = Math.round(st.top + k * d - (t - 1) / 2) - y0;
+    const e = s + t - 1;
+    if (s - 2 < 0 || e + 2 >= h) continue;
+    for (let x = 0; x < w; x++) {
+      if (!m[(s - 2) * w + x] && !m[(e + 2) * w + x]) {
+        for (let y = s - 1; y <= e + 1; y++) m[y * w + x] = 0;
+      }
+    }
+  }
+  // Integral image.
+  const W1 = w + 1;
+  const ii = new Int32Array(W1 * (h + 1));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      ii[(y + 1) * W1 + x + 1] = m[y * w + x] + ii[y * W1 + x + 1] + ii[(y + 1) * W1 + x] - ii[y * W1 + x];
+    }
+  }
+  // Filled heads: what survives erosion by a box wider than stems and beams.
+  const e = Math.max(3, Math.round(0.7 * d));
+  const half = Math.floor(e / 2);
+  const er = new Uint8Array(w * h);
+  for (let y = 0; y + e <= h; y++) {
+    for (let x = 0; x + e <= w; x++) {
+      const s = ii[(y + e) * W1 + x + e] - ii[y * W1 + x + e] - ii[(y + e) * W1 + x] + ii[y * W1 + x];
+      if (s >= e * e * 0.95) er[(y + half) * w + x + half] = 1;
+    }
+  }
+  const cands = labelComponents(er, w, h).map(c => ({ cx: c.cx, cy: c.cy, hollow: false }));
+  // Hollow heads: enclosed white holes of the right size.
+  const reach = new Uint8Array(w * h);
+  const stack = [];
+  const seed = i => { if (!m[i] && !reach[i]) { reach[i] = 1; stack.push(i); } };
+  for (let x = 0; x < w; x++) { seed(x); seed((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { seed(y * w); seed(y * w + w - 1); }
+  while (stack.length) {
+    const p = stack.pop();
+    const px = p % w;
+    if (px > 0) seed(p - 1);
+    if (px < w - 1) seed(p + 1);
+    if (p >= w) seed(p - w);
+    if (p < w * (h - 1)) seed(p + w);
+  }
+  const holes = new Uint8Array(w * h);
+  for (let i = 0; i < holes.length; i++) holes[i] = (!m[i] && !reach[i]) ? 1 : 0;
+  for (const c of labelComponents(holes, w, h)) {
+    const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
+    if (bw >= 0.4 * d && bw <= 1.4 * d && bh >= 0.25 * d && bh <= 0.9 * d && bw >= bh * 1.15) {
+      cands.push({ cx: (c.minx + c.maxx) / 2, cy: (c.miny + c.maxy) / 2, hollow: true });
+    }
+  }
+  // Drop duplicates.
+  cands.sort((a, b) => a.cx - b.cx);
+  const uniq = [];
+  for (const c of cands) {
+    if (!uniq.some(u => Math.abs(u.cx - c.cx) < 0.5 * d && Math.abs(u.cy - c.cy) < 0.5 * d)) uniq.push(c);
+  }
+  // Keep only the top note when several heads share a stem position (chords).
+  const single = [];
+  for (const c of uniq) {
+    const prev = single[single.length - 1];
+    if (prev && Math.abs(prev.cx - c.cx) < 0.6 * d) { if (c.cy < prev.cy) single[single.length - 1] = c; }
+    else single.push(c);
+  }
+  const base = st.top + 4 * d;
+  const out = [];
+  for (const c of single) {
+    const step = Math.round((base - (y0 + c.cy)) / (d / 2));
+    if (step < -5 || step > (c.hollow ? 11 : 14)) continue;
+    const up = stemRun(m, w, h, c.cx, c.cy, d, -1);
+    const down = stemRun(m, w, h, c.cx, c.cy, d, 1);
+    const dir = up.n >= down.n ? -1 : 1;
+    const stem = dir < 0 ? up : down;
+    const hasStem = stem.n >= 2.2 * d;
+    let beats;
+    if (c.hollow) beats = hasStem ? 2 : 4;
+    else {
+      beats = 1;
+      if (hasStem) {
+        // Count flags/beams: ink runs along the stem, just beside it near the tip.
+        const inward = dir < 0 ? 1 : -1;
+        const len = Math.round(Math.min(2.0 * d, stem.n - 1.0 * d));
+        const ya = stem.end;
+        // Keep only ink connected to the stem tip, so chord symbols and
+        // lyrics near the tip are not mistaken for flags.
+        const rx = Math.round(1.2 * d);
+        const bx0 = Math.max(0, stem.x - rx), bx1 = Math.min(w - 1, stem.x + rx);
+        const conn = new Set();
+        const q = [];
+        for (let k = 0; k <= len; k++) {
+          const y = ya + inward * k;
+          if (y < 0 || y >= h) break;
+          for (let dx = -1; dx <= 1; dx++) {
+            const x = stem.x + dx;
+            if (x >= 0 && x < w && m[y * w + x]) { const key = y * w + x; if (!conn.has(key)) { conn.add(key); q.push(key); } }
+          }
+        }
+        while (q.length) {
+          const p = q.pop();
+          const px = p % w, py = (p - px) / w;
+          for (const [ax, ay] of [[px - 1, py], [px + 1, py], [px, py - 1], [px, py + 1]]) {
+            if (ax < bx0 || ax > bx1) continue;
+            const kk = (ay - ya) * inward;
+            if (kk < 0 || kk > len) continue;
+            const key = ay * w + ax;
+            if (m[key] && !conn.has(key)) { conn.add(key); q.push(key); }
+          }
+        }
+        let best = 0;
+        for (const side of [1, -1]) {
+          for (const off of [0.45, 0.65, 0.85]) {
+            const x = Math.round(stem.x + side * off * d);
+            if (x < 0 || x >= w) continue;
+            let runs = 0, lastInk = -999;
+            const gapMin = Math.max(2, Math.round(0.18 * d));
+            for (let k = 0; k <= len; k++) {
+              const y = ya + inward * k;
+              if (y < 0 || y >= h) break;
+              if (conn.has(y * w + x)) { if (k - lastInk > gapMin) runs++; lastInk = k; }
+            }
+            if (runs > best) best = runs;
+          }
+        }
+        beats = best >= 2 ? 0.25 : best === 1 ? 0.5 : 1;
+      }
+    }
+    for (const dy of [-0.5, 0, 0.5]) {
+      const core = boxFrac(ii, w, h, c.cx + 1.08 * d, c.cy + (dy - 0.12) * d, c.cx + 1.32 * d, c.cy + (dy + 0.12) * d);
+      const outer = boxFrac(ii, w, h, c.cx + 0.8 * d, c.cy + (dy - 0.4) * d, c.cx + 1.6 * d, c.cy + (dy + 0.4) * d);
+      if (core >= 0.75 && outer <= 0.4) { beats *= 1.5; break; }
+    }
+    out.push({ step, beats, x: x0 + c.cx, y: y0 + c.cy, d });
+  }
+  return out;
+}
+
+function findBarlines(bin, W, H, st, skip) {
+  const d = st.d, top = Math.round(st.top), bot = Math.round(st.top + 4 * d);
+  const xs = [];
+  const xa = Math.max(0, Math.round(st.x0 + skip * d * 0.6));
+  for (let x = xa; x <= st.x1; x++) {
+    let ink = 0, tot = 0;
+    for (let y = top + Math.round(0.3 * d); y <= bot - Math.round(0.3 * d); y++) { tot++; ink += bin[y * W + x]; }
+    if (ink < tot * 0.97) continue;
+    let out = 0;
+    for (let k = 1; k <= Math.round(0.5 * d); k++) out += bin[(top - Math.round(0.3 * d) - k) * W + x] + bin[(bot + Math.round(0.3 * d) + k) * W + x];
+    if (out > 1) continue;
+    xs.push(x);
+  }
+  const bars = [];
+  for (const x of xs) {
+    const last = bars[bars.length - 1];
+    if (last && x - last.hi <= 1.5 * d) last.hi = x; else bars.push({ lo: x, hi: x });
+  }
+  return bars.map(b => (b.lo + b.hi) / 2);
+}
+
+// Fix triplets: when a bar holds more beats than it should, turn runs of
+// three equal short notes into triplets until the bar adds up.
+function fixMeasure(ms, target) {
+  const sum = a => a.reduce((s, n) => s + n.beats, 0);
+  const S = sum(ms);
+  const excess = S - target;
+  if (excess < 0.2) return true;
+  const wins = [];
+  for (let i = 0; i + 2 < ms.length; i++) {
+    const b = ms[i].beats;
+    if ((b === 0.5 || b === 1) && ms[i + 1].beats === b && ms[i + 2].beats === b) wins.push({ i, red: b === 0.5 ? 0.5 : 1, b });
+  }
+  let found = null;
+  (function dfs(k, chosen, red) {
+    if (found) return;
+    if (Math.abs(red - excess) < 1e-6) { found = chosen.slice(); return; }
+    if (red > excess + 1e-6) return;
+    for (let j = k; j < wins.length; j++) {
+      const w = wins[j];
+      if (chosen.some(c => Math.abs(c.i - w.i) < 3)) continue;
+      chosen.push(w); dfs(j + 1, chosen, red + w.red); chosen.pop();
+    }
+  })(0, [], 0);
+  if (!found) return false;
+  for (const w of found) for (let k = 0; k < 3; k++) ms[w.i + k].beats = w.b * 2 / 3;
+  return true;
+}
+
+function analyzeBinary(bin, W, H, opt) {
+  const all = findStaves(bin, W, H);
+  const used = [];
+  const notes = [];
+  let badBars = 0, bars = 0;
+  all.forEach((st, i) => {
+    if (opt.mode === 'odd' && i % 2 !== 0) return;
+    if (opt.mode === 'even' && i % 2 !== 1) return;
+    used.push(st);
+    const baseDia = opt.clef === 'bass' ? 18 : 30; // G2 or E4 on the bottom line
+    const shift = opt.clef === 'treble8' ? -12 : 0;
+    const acc = keyAccidentals(opt.key);
+    // The very first staff also carries the time signature, so skip a bit more there.
+    const sopt = Object.assign({}, opt, { skip: opt.skip + (i === 0 && opt.first ? 3 : 0) });
+    const staffNotes = readStaff(bin, W, H, st, sopt).map(n => ({ midi: midiFromDia(baseDia + n.step, acc, shift), beats: n.beats, x: n.x, y: n.y, d: n.d, staff: used.length - 1 }));
+    if (opt.measure) {
+      const lines = findBarlines(bin, W, H, st, sopt.skip);
+      const groups = [];
+      for (const n of staffNotes) {
+        let g = 0;
+        while (g < lines.length && lines[g] < n.x) g++;
+        (groups[g] = groups[g] || []).push(n);
+      }
+      for (const ms of groups) {
+        if (!ms) continue;
+        bars++;
+        if (!fixMeasure(ms, opt.measure)) badBars++;
+      }
+    }
+    notes.push(...staffNotes);
+  });
+  return { staves: used, notes, bars, badBars };
+}
+// ==OMR-END==
+
+// ---------- App ----------
+const $ = id => document.getElementById(id);
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const DURS = [[0.25, 'sixteenth'], [1 / 3, 'eighth triplet'], [2 / 3, 'quarter triplet'], [0.5, 'eighth'], [0.75, 'dotted eighth'], [1, 'quarter'], [1.5, 'dotted quarter'], [2, 'half'], [3, 'dotted half'], [4, 'whole']];
+const NAMES_S = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NAMES_F = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const LETTER = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+let pdfDoc = null, baseName = 'melody';
+let pages = [];   // {canvas, overlay, staves}
+let notes = [];   // {midi|null, beats, page, x, y, d}
+let selected = -1;
+let audioCtx = null, playSrc = null, mp3Url = null, mp3Blob = null;
+
+function setStatus(id, text, cls) { const el = $(id); el.textContent = text || ''; el.className = 'status' + (cls ? ' ' + cls : ''); }
+const flatKey = () => parseInt($('key').value, 10) < 0;
+function midiName(m) { if (m == null) return 'R'; return (flatKey() ? NAMES_F : NAMES_S)[m % 12] + (Math.floor(m / 12) - 1); }
+function parseName(s) {
+  s = s.trim().replace('♯', '#').replace('♭', 'b');
+  if (/^(r|rest)$/i.test(s)) return null;
+  const mt = /^([A-Ga-g])([#b]?)(-?\d)$/.exec(s);
+  if (!mt) return undefined;
+  const midi = 12 * (parseInt(mt[3], 10) + 1) + LETTER[mt[1].toUpperCase()] + (mt[2] === '#' ? 1 : mt[2] === 'b' ? -1 : 0);
+  return (midi >= 24 && midi <= 108) ? midi : undefined;
+}
+
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  baseName = f.name.replace(/\.pdf$/i, '') || 'melody';
+  setStatus('status1', 'Opening the PDF…');
+  $('readBtn').disabled = true;
+  $('reviewCard').classList.add('hidden');
+  try {
+    pdfDoc = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
+    setStatus('status1', f.name + ' · ' + pdfDoc.numPages + ' page' + (pdfDoc.numPages > 1 ? 's' : ''), 'ok');
+    $('readBtn').disabled = false;
+  } catch (err) {
+    pdfDoc = null;
+    setStatus('status1', 'Could not open this PDF. Try another file.', 'warn');
+  }
+});
+
+async function renderPages() {
+  const host = $('pages');
+  host.innerHTML = '';
+  pages = [];
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.min(4, 1700 / base.width);
+    const vp = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const overlay = document.createElement('canvas');
+    overlay.className = 'ov';
+    overlay.width = canvas.width; overlay.height = canvas.height;
+    const wrap = document.createElement('div');
+    wrap.className = 'pagewrap';
+    wrap.append(canvas, overlay);
+    host.append(wrap);
+    pages.push({ canvas, overlay, staves: [] });
+  }
+}
+
+$('readBtn').addEventListener('click', async () => {
+  if (!pdfDoc) return;
+  $('readBtn').disabled = true;
+  stopPlay();
+  setStatus('status2', 'Reading the page…');
+  try {
+    await new Promise(r => setTimeout(r, 30));
+    await renderPages();
+    const opt = {
+      clef: $('clef').value,
+      key: parseInt($('key').value, 10),
+      skip: Math.min(14, Math.max(2, parseFloat($('skip').value) || 7)),
+      mode: $('mode').value,
+      measure: parseFloat($('ts').value) || 0,
+      first: false
+    };
+    notes = [];
+    let staffCount = 0, bars = 0, badBars = 0;
+    for (let i = 0; i < pages.length; i++) {
+      setStatus('status2', 'Reading notes, page ' + (i + 1) + ' of ' + pages.length + '…');
+      await new Promise(r => setTimeout(r, 10));
+      const cv = pages[i].canvas;
+      const img = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      opt.first = (i === 0);
+      const res = analyzeBinary(toBinary(img, cv.width, cv.height), cv.width, cv.height, opt);
+      pages[i].staves = res.staves;
+      staffCount += res.staves.length; bars += res.bars; badBars += res.badBars;
+      // Notes from a page come in staff order, left to right.
+      res.notes.forEach(n => notes.push({ midi: n.midi, beats: n.beats, page: i, x: n.x, y: n.y, d: n.d }));
+    }
+    $('reviewCard').classList.remove('hidden');
+    selected = -1;
+    buildList(); drawOverlays();
+    $('reviewCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!staffCount) setStatus('status2', 'No staff lines found. Is this a scanned or photographed page? It works best with computer-made PDFs.', 'warn');
+    else if (!notes.length) setStatus('status2', 'Found ' + staffCount + ' staves but no notes. Try changing "Skip at the start" in More options.', 'warn');
+    else setStatus('status2', 'Read ' + notes.length + ' notes from ' + staffCount + ' staves.' + (badBars ? ' ' + badBars + ' of ' + bars + ' bars do not add up (often rests, ties or two voices). Please check the notes below.' : ' Please check them below.'), badBars ? 'warn' : 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('status2', 'Something went wrong while reading the page.', 'warn');
+  }
+  $('readBtn').disabled = false;
+});
+
+function drawOverlays() {
+  pages.forEach((pg, pi) => {
+    const ctx = pg.overlay.getContext('2d');
+    ctx.clearRect(0, 0, pg.overlay.width, pg.overlay.height);
+    ctx.lineWidth = 2;
+    notes.forEach((n, i) => {
+      if (n.page !== pi || n.x == null) return;
+      const sel = i === selected;
+      ctx.strokeStyle = sel ? '#e5261f' : '#2f6fed';
+      ctx.fillStyle = sel ? '#e5261f' : '#2f6fed';
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.d * (sel ? 0.9 : 0.7), 0, Math.PI * 2); ctx.stroke();
+      ctx.font = 'bold ' + Math.round(n.d * 0.85) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.midi == null ? 'R' : midiName(n.midi), n.x, n.y + n.d * 2.0);
+    });
+  });
+}
+
+function buildList() {
+  const host = $('list');
+  host.innerHTML = '';
+  notes.forEach((n, i) => {
+    const row = document.createElement('div');
+    row.className = 'note' + (i === selected ? ' sel' : '');
+    const num = document.createElement('div'); num.className = 'n'; num.textContent = i + 1;
+    const name = document.createElement('input');
+    name.type = 'text'; name.value = midiName(n.midi); name.autocapitalize = 'characters'; name.autocomplete = 'off';
+    name.addEventListener('focus', () => select(i, row));
+    name.addEventListener('change', () => {
+      const v = parseName(name.value);
+      if (v === undefined) { name.value = midiName(n.midi); return; }
+      n.midi = v; name.value = midiName(v); drawOverlays();
+    });
+    const dur = document.createElement('select');
+    DURS.forEach(([b, label]) => { const o = document.createElement('option'); o.value = b; o.textContent = label; if (Math.abs(b - n.beats) < 1e-3) o.selected = true; dur.append(o); });
+    dur.addEventListener('focus', () => select(i, row));
+    dur.addEventListener('change', () => { n.beats = parseFloat(dur.value); });
+    const del = document.createElement('button'); del.className = 'sec'; del.textContent = '✕'; del.title = 'Delete';
+    del.addEventListener('click', () => { notes.splice(i, 1); selected = -1; buildList(); drawOverlays(); });
+    const add = document.createElement('button'); add.className = 'sec'; add.textContent = '＋'; add.title = 'Add a rest after';
+    add.addEventListener('click', () => { notes.splice(i + 1, 0, { midi: null, beats: 1, page: n.page }); selected = i + 1; buildList(); drawOverlays(); });
+    row.append(num, name, dur, del, add);
+    host.append(row);
+  });
+}
+
+function select(i, row) {
+  selected = i;
+  document.querySelectorAll('.note.sel').forEach(r => r.classList.remove('sel'));
+  row.classList.add('sel');
+  drawOverlays();
+}
+
+// ---------- Sound ----------
+function synth(sr) {
+  const bpm = Math.min(240, Math.max(30, parseFloat($('bpm').value) || 90));
+  const spb = 60 / bpm;
+  let total = 0;
+  notes.forEach(n => total += n.beats * spb);
+  const out = new Float32Array(Math.ceil((total + 0.6) * sr));
+  const harm = [1, 0.5, 0.25, 0.12];
+  let t = 0;
+  for (const n of notes) {
+    const dur = n.beats * spb;
+    if (n.midi != null) {
+      const f = 440 * Math.pow(2, (n.midi - 69) / 12);
+      const start = Math.floor(t * sr);
+      const len = Math.min(out.length - start, Math.floor((dur + 0.12) * sr));
+      const decay = 2.2 / Math.max(dur, 0.35);
+      for (let i = 0; i < len; i++) {
+        const tt = i / sr;
+        let env = Math.min(1, tt / 0.008) * Math.exp(-decay * tt);
+        const toEnd = (len - i) / sr;
+        if (toEnd < 0.04) env *= toEnd / 0.04;
+        if (tt > dur) env *= Math.max(0, 1 - (tt - dur) / 0.12);
+        let s = 0;
+        for (let h = 0; h < harm.length; h++) s += harm[h] * Math.sin(2 * Math.PI * f * (h + 1) * tt);
+        out[start + i] += env * s * 0.3;
+      }
+    }
+    t += dur;
+  }
+  let peak = 0;
+  for (let i = 0; i < out.length; i++) { const a = Math.abs(out[i]); if (a > peak) peak = a; }
+  const g = peak > 0 ? 0.89 / peak : 1;
+  for (let i = 0; i < out.length; i++) out[i] *= g;
+  return out;
+}
+
+function stopPlay() {
+  if (playSrc) { try { playSrc.stop(); } catch (e) {} playSrc = null; }
+  $('playBtn').textContent = '▶ Play';
+}
+
+$('playBtn').addEventListener('click', () => {
+  if (playSrc) { stopPlay(); return; }
+  if (!notes.some(n => n.midi != null)) { setStatus('status3', 'There are no notes to play.', 'warn'); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const sr = audioCtx.sampleRate;
+  const data = synth(sr);
+  const buf = audioCtx.createBuffer(1, data.length, sr);
+  buf.copyToChannel(data, 0);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf; src.connect(audioCtx.destination);
+  src.onended = () => { if (playSrc === src) stopPlay(); };
+  src.start();
+  playSrc = src;
+  $('playBtn').textContent = '■ Stop';
+  setStatus('status3', '');
+});
+
+$('mp3Btn').addEventListener('click', async () => {
+  if (!notes.some(n => n.midi != null)) { setStatus('status3', 'There are no notes to make into an MP3.', 'warn'); return; }
+  stopPlay();
+  $('mp3Btn').disabled = true;
+  setStatus('status3', 'Making the MP3…');
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const sr = 44100;
+    const data = synth(sr);
+    const pcm = new Int16Array(data.length);
+    for (let i = 0; i < data.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(data[i] * 32767)));
+    const enc = new lamejs.Mp3Encoder(1, sr, 128);
+    const parts = [];
+    for (let i = 0, c = 0; i < pcm.length; i += 1152, c++) {
+      const b = enc.encodeBuffer(pcm.subarray(i, i + 1152));
+      if (b.length) parts.push(b);
+      if (c % 300 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    const end = enc.flush();
+    if (end.length) parts.push(end);
+    mp3Blob = new Blob(parts, { type: 'audio/mpeg' });
+    if (mp3Url) URL.revokeObjectURL(mp3Url);
+    mp3Url = URL.createObjectURL(mp3Blob);
+    $('player').src = mp3Url;
+    $('dl').href = mp3Url;
+    $('dl').download = baseName + '.mp3';
+    $('result').classList.remove('hidden');
+    const file = new File([mp3Blob], baseName + '.mp3', { type: 'audio/mpeg' });
+    $('shareBtn').classList.toggle('hidden', !(navigator.canShare && navigator.canShare({ files: [file] })));
+    setStatus('status3', 'Your MP3 is ready.', 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('status3', 'Could not make the MP3.', 'warn');
+  }
+  $('mp3Btn').disabled = false;
+});
+
+$('shareBtn').addEventListener('click', async () => {
+  if (!mp3Blob) return;
+  try { await navigator.share({ files: [new File([mp3Blob], baseName + '.mp3', { type: 'audio/mpeg' })] }); } catch (e) {}
+});
+</script>
+</body>
+</html>
