@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Music Sheet to MP3</title>
-<meta name="description" content="Turn a simple PDF music sheet into a melody MP3. Reads the notes, lets you fix them, then plays and exports the MP3 in your browser.">
+<meta name="description" content="Turn a PDF music sheet into a melody MP3 and MIDI file. Reads the notes, key and time signature, and lets you fix them, all in your browser.">
 <link rel="apple-touch-icon" sizes="180x180" href="music-sheet-to-mp3-icon.png">
 <link rel="icon" href="music-sheet-to-mp3-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -48,85 +48,95 @@
 <body>
 <main>
   <h1>Music Sheet to MP3</h1>
-  <p class="sub">Turn a simple PDF music sheet (one melody line) into an MP3. Everything happens on your device.</p>
+  <p class="sub">Turn a PDF music sheet into an MP3 and a MIDI file. Everything happens on your device.</p>
 
   <section class="card">
     <h2>1. Choose your PDF</h2>
     <input id="file" type="file" accept="application/pdf,.pdf">
     <div id="status1" class="status"></div>
-  </section>
-
-  <section class="card">
-    <h2>2. Settings</h2>
-    <div class="row2">
-      <div>
-        <label for="clef">Clef / voice</label>
-        <select id="clef">
-          <option value="treble">Treble (normal)</option>
-          <option value="treble8">Treble 8vb (male voice)</option>
-          <option value="bass">Bass</option>
-        </select>
+    <details id="adv">
+      <summary>Advanced settings</summary>
+      <p class="small">Key and time signature are found automatically. Change them here only if the result sounds wrong.</p>
+      <div class="row2">
+        <div>
+          <label for="clef">Clef / voice</label>
+          <select id="clef">
+            <option value="treble">Treble (normal)</option>
+            <option value="treble8">Treble 8vb (male voice)</option>
+            <option value="bass">Bass</option>
+          </select>
+        </div>
+        <div>
+          <label for="key">Key signature</label>
+          <select id="key">
+            <option value="auto">Auto</option>
+            <option value="0">C major / A minor</option>
+            <option value="1">G major / E minor (1 sharp)</option>
+            <option value="2">D major / B minor (2 sharps)</option>
+            <option value="3">A major / F♯ minor (3 sharps)</option>
+            <option value="4">E major / C♯ minor (4 sharps)</option>
+            <option value="5">B major (5 sharps)</option>
+            <option value="-1">F major / D minor (1 flat)</option>
+            <option value="-2">B♭ major / G minor (2 flats)</option>
+            <option value="-3">E♭ major / C minor (3 flats)</option>
+            <option value="-4">A♭ major / F minor (4 flats)</option>
+            <option value="-5">D♭ major (5 flats)</option>
+          </select>
+        </div>
       </div>
-      <div>
-        <label for="key">Key signature</label>
-        <select id="key">
-          <option value="0">C major / A minor</option>
-          <option value="1">G major (1 sharp)</option>
-          <option value="2">D major (2 sharps)</option>
-          <option value="3">A major (3 sharps)</option>
-          <option value="4">E major (4 sharps)</option>
-          <option value="-1">F major (1 flat)</option>
-          <option value="-2">B♭ major (2 flats)</option>
-          <option value="-3">E♭ major (3 flats)</option>
-          <option value="-4">A♭ major (4 flats)</option>
-        </select>
+      <div class="row2">
+        <div>
+          <label for="ts">Time signature</label>
+          <select id="ts">
+            <option value="auto">Auto</option>
+            <option value="2">2/4</option>
+            <option value="3">3/4</option>
+            <option value="4">4/4</option>
+            <option value="6/8">6/8</option>
+            <option value="0">Don't check bars</option>
+          </select>
+        </div>
+        <div>
+          <label for="bpm">Tempo (quarter notes per minute)</label>
+          <input id="bpm" type="number" min="30" max="240" value="80" inputmode="numeric">
+        </div>
       </div>
-    </div>
-    <label for="ts">Time signature</label>
-    <select id="ts">
-      <option value="2">2/4</option>
-      <option value="3">3/4</option>
-      <option value="4">4/4</option>
-      <option value="3">6/8</option>
-      <option value="0">Don't check bars</option>
-    </select>
-    <label for="bpm">Tempo (quarter notes per minute)</label>
-    <input id="bpm" type="number" min="30" max="240" value="90" inputmode="numeric">
-    <details>
-      <summary>More options</summary>
       <label for="mode">Which staves to read</label>
       <select id="mode">
         <option value="all">All staves</option>
         <option value="odd">1st, 3rd, 5th… (top of each pair)</option>
         <option value="even">2nd, 4th, 6th… (bottom of each pair)</option>
       </select>
-      <label for="skip">Skip at the start of each staff (staff spaces, covers clef, key and time signature)</label>
-      <input id="skip" type="number" min="2" max="14" step="0.5" value="7" inputmode="decimal">
+      <label for="skip">Skip at the start of each staff (staff spaces, covers clef and key signature)</label>
+      <input id="skip" type="number" min="2" max="14" step="0.5" value="" placeholder="Auto" inputmode="decimal">
     </details>
-    <div class="btns"><button id="readBtn" disabled>Read the notes</button></div>
+    <div class="btns"><button id="convertBtn" disabled>Convert Now</button></div>
     <div id="status2" class="status"></div>
   </section>
 
-  <section class="card hidden" id="reviewCard">
-    <h2>3. Check the notes</h2>
-    <p class="small">Blue circles mark what was read. Fix any wrong note below (type a name like C4, F#3, Bb4, or R for a rest), change its length, delete it, or add a rest with ＋.</p>
-    <div id="pages" class="pages"></div>
-    <div id="list"></div>
+  <section class="card hidden" id="resultCard">
+    <h2>2. Your music</h2>
+    <p id="summary" class="small"></p>
+    <audio id="player" controls></audio>
     <div class="btns">
-      <button id="playBtn" class="sec">▶ Play</button>
-      <button id="mp3Btn">Make MP3</button>
+      <a id="dl" class="btn" download="melody.mp3">Download MP3</a>
+      <a id="dlMidi" class="btn" download="melody.mid">Download MIDI</a>
     </div>
-    <div id="status3" class="status"></div>
-    <div id="result" class="hidden">
-      <audio id="player" controls></audio>
+    <div class="btns"><button id="shareBtn" class="sec hidden">Save / Share MP3</button></div>
+    <details id="review">
+      <summary>Check and fix the notes (optional)</summary>
+      <p class="small">Blue circles mark what was read. Fix any wrong note below (type a name like C4, F#3, Bb4, or R for a rest; a chord is several names, like C5 A4), change its length, delete it, or add a rest with ＋. Then tap Update.</p>
+      <div id="pages" class="pages"></div>
+      <div id="list"></div>
       <div class="btns">
-        <a id="dl" class="btn" download="melody.mp3">Download MP3</a>
-        <button id="shareBtn" class="sec hidden">Save / Share</button>
+        <button id="playBtn" class="sec">▶ Play</button>
+        <button id="updateBtn">Update MP3 and MIDI</button>
       </div>
-    </div>
+      <div id="status3" class="status"></div>
+    </details>
   </section>
 
-  <p class="small">Works best with clean, computer-made PDFs showing a single melody. It reads note heads, note lengths (including dotted notes and triplets), and the top note of stacked chords. It does not read rests, sharps/flats written beside a note, ties, or repeats and endings (it plays straight through). Fix those in the list.</p>
+  <p class="small">Works best with clean, computer-made PDFs. It follows the melody (the top note of stacked chords) and reads note lengths, rests, ties, dotted notes, triplets and sharps/flats. It plays straight through, so repeats and endings are not followed. Check the notes if something sounds off.</p>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -154,7 +164,7 @@ function toBinary(rgba, W, H) {
   const bin = new Uint8Array(W * H);
   for (let i = 0, j = 0; i < bin.length; i++, j += 4) {
     const l = 0.299 * rgba[j] + 0.587 * rgba[j + 1] + 0.114 * rgba[j + 2];
-    bin[i] = l < 150 ? 1 : 0;
+    bin[i] = l < 165 ? 1 : 0;
   }
   return bin;
 }
@@ -259,9 +269,32 @@ function stemRun(m, w, h, cx, cy, d, dir) {
   return best;
 }
 
+function uniqHas(cands, sx, t, d) {
+  // Is a solid head already found at either end of this stem?
+  return cands.some(c => !c.hollow && Math.abs(c.cx - sx) < 1.1 * d && (Math.abs(c.cy - t.y1) < 0.8 * d || Math.abs(c.cy - t.y0) < 0.8 * d));
+}
+
+function hasTie(m, w, h, a, b, d) {
+  // A tie is a thin arc hugging two heads of the same pitch, on the side away from the stems.
+  const xa = Math.round(a.cx + 1.0 * d), xb = Math.round(b.cx - 1.0 * d);
+  if (xb - xa < 0.8 * d) return false;
+  for (const side of [1, -1]) {
+    let cols = 0, tot = 0;
+    for (let x = Math.max(0, xa); x <= Math.min(w - 1, xb); x++) {
+      tot++;
+      for (let dy = 0.4 * d; dy <= 2.0 * d; dy += 1) {
+        const y = Math.round(a.cy + side * dy);
+        if (y >= 0 && y < h && m[y * w + x]) { cols++; break; }
+      }
+    }
+    if (tot && cols >= 0.78 * tot) return true;
+  }
+  return false;
+}
+
 function readStaff(bin, W, H, st, opt) {
   const d = st.d;
-  const y0 = Math.max(0, Math.round(st.top - 3.5 * d));
+  const y0 = Math.max(0, Math.round(st.top - 5.5 * d));
   const y1 = Math.min(H - 1, Math.round(st.top + 7.5 * d));
   const x0 = Math.max(0, Math.round(st.x0 + opt.skip * d));
   const x1 = Math.min(W - 1, st.x1);
@@ -272,6 +305,7 @@ function readStaff(bin, W, H, st, opt) {
     const row = (y + y0) * W + x0;
     for (let x = 0; x < w; x++) m[y * w + x] = bin[row + x];
   }
+  const m0 = Uint8Array.from(m);   // before erasing lines: a head sitting on a ledger line keeps its closed ring here
   // Erase staff lines and ledger-line positions where nothing crosses them.
   const t = Math.max(1, Math.round(st.t));
   for (let k = -3; k <= 7; k++) {
@@ -302,27 +336,98 @@ function readStaff(bin, W, H, st, opt) {
       if (s >= e * e * 0.95) er[(y + half) * w + x + half] = 1;
     }
   }
-  const cands = labelComponents(er, w, h).map(c => ({ cx: c.cx, cy: c.cy, hollow: false }));
-  // Hollow heads: enclosed white holes of the right size.
-  const reach = new Uint8Array(w * h);
-  const stack = [];
-  const seed = i => { if (!m[i] && !reach[i]) { reach[i] = 1; stack.push(i); } };
-  for (let x = 0; x < w; x++) { seed(x); seed((h - 1) * w + x); }
-  for (let y = 0; y < h; y++) { seed(y * w); seed(y * w + w - 1); }
-  while (stack.length) {
-    const p = stack.pop();
-    const px = p % w;
-    if (px > 0) seed(p - 1);
-    if (px < w - 1) seed(p + 1);
-    if (p >= w) seed(p - w);
-    if (p < w * (h - 1)) seed(p + w);
+  // Touching heads of a chord fuse into one tall blob: cut it into one head per staff space step.
+  const cands = [];
+  for (const c of labelComponents(er, w, h)) {
+    const span = c.maxy - c.miny;
+    if (span > 2.5 * d) continue;   // a thick final barline, not a chord
+    const n = span >= 0.75 * d ? Math.round(span / d) + 1 : 1;
+    if (n === 1) cands.push({ cx: c.cx, cy: c.cy, hollow: false });
+    else for (let k = 0; k < n; k++) cands.push({ cx: c.cx, cy: c.miny + span * k / (n - 1), hollow: false });
   }
-  const holes = new Uint8Array(w * h);
-  for (let i = 0; i < holes.length; i++) holes[i] = (!m[i] && !reach[i]) ? 1 : 0;
-  for (const c of labelComponents(holes, w, h)) {
-    const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
-    if (bw >= 0.4 * d && bw <= 1.4 * d && bh >= 0.25 * d && bh <= 0.9 * d && bw >= bh * 1.15) {
-      cands.push({ cx: (c.minx + c.maxx) / 2, cy: (c.miny + c.maxy) / 2, hollow: true });
+  // Hollow heads: enclosed white holes of the right size (searched with and without the lines erased).
+  for (const mask of [m, m0]) {
+    const reach = new Uint8Array(w * h);
+    const stack = [];
+    const seed = i => { if (!mask[i] && !reach[i]) { reach[i] = 1; stack.push(i); } };
+    for (let x = 0; x < w; x++) { seed(x); seed((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { seed(y * w); seed(y * w + w - 1); }
+    while (stack.length) {
+      const p = stack.pop();
+      const px = p % w;
+      if (px > 0) seed(p - 1);
+      if (px < w - 1) seed(p + 1);
+      if (p >= w) seed(p - w);
+      if (p < w * (h - 1)) seed(p + w);
+    }
+    const holes = new Uint8Array(w * h);
+    for (let i = 0; i < holes.length; i++) holes[i] = (!mask[i] && !reach[i]) ? 1 : 0;
+    for (const c of labelComponents(holes, w, h)) {
+      const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
+      if (bw >= 0.4 * d && bw <= 1.4 * d && bh >= 0.25 * d && bh <= (mask === m0 ? 1.0 : 0.9) * d && bw >= bh * (mask === m0 ? 0.7 : 1.15)) {
+        const hy = y0 + (c.miny + c.maxy) / 2;
+        const hs = Math.round((st.top + 4 * d - hy) / (d / 2));
+        // With the lines still in place, only trust holes above or below the staff (ledger-line notes).
+        if (mask === m0 && !(hs >= 10 || hs <= -2)) continue;
+        // A white gap between two beams has a stem on both sides; a hollow head has at most one.
+        const rowY = Math.round((c.miny + c.maxy) / 2);
+        const vrun = xx => { if (xx < 0 || xx >= w) return 0; let up = 0, dn = 0; while (rowY - up - 1 >= 0 && m[(rowY - up - 1) * w + xx]) up++; while (rowY + dn + 1 < h && m[(rowY + dn + 1) * w + xx]) dn++; return up + dn + 1; };
+        const sideRun = (xx0) => Math.max(vrun(xx0 - 1), vrun(xx0), vrun(xx0 + 1));
+        if (sideRun(c.minx - 3) >= 2.2 * d && sideRun(c.maxx + 3) >= 2.2 * d) continue;
+        cands.push({ cx: (c.minx + c.maxx) / 2, cy: (c.miny + c.maxy) / 2, hollow: true });
+      }
+    }
+  }
+  // Hollow heads with a stem (half notes): find long thin vertical strokes with no solid head
+  // at either end, and look for an outlined head there. Works even when the hole is too thin to see.
+  {
+    const minStem = Math.round(2.9 * d);
+    const runs = [];
+    for (let x = 0; x < w; x++) {
+      let start = -1, last = -1, gap = 0;
+      for (let y = 0; y <= h; y++) {
+        const on = y < h && m[y * w + x];
+        if (on) { if (start < 0) start = y; last = y; gap = 0; }
+        else if (start >= 0) {
+          gap++;
+          if (gap > 2 || y >= h) { if (last - start + 1 >= minStem) runs.push({ x, y0: start, y1: last }); start = -1; }
+        }
+      }
+    }
+    const stems = [];
+    for (const r of runs) {
+      const q = stems.find(t => Math.abs(t.x1 - r.x) <= 2 && r.y0 <= t.y1 && r.y1 >= t.y0);
+      if (q) { q.x1 = r.x; q.sx += r.x; q.n++; q.y0 = Math.min(q.y0, r.y0); q.y1 = Math.max(q.y1, r.y1); }
+      else stems.push({ x1: r.x, sx: r.x, n: 1, y0: r.y0, y1: r.y1 });
+    }
+    const topY = st.top - y0, botY = st.top + 4 * d - y0;
+    for (const t of stems) {
+      const sx = t.sx / t.n;
+      if (t.n > 4) continue;                                   // too thick to be a stem
+      if (t.y0 >= topY - 0.35 * d && t.y1 <= botY + 0.35 * d && t.y1 - t.y0 >= 3.7 * d) continue; // barline
+      if (uniqHas(cands, sx, t, d)) continue;
+      const hyp = [
+        { cx: sx - 0.62 * d, cy: t.y1 - 0.05 * d, x0: sx - 1.25 * d, x1: sx - 0.1 * d },   // stem up, head at the bottom left
+        { cx: sx + 0.62 * d, cy: t.y0 + 0.05 * d, x0: sx + 0.1 * d, x1: sx + 1.25 * d }    // stem down, head at the top right
+      ];
+      let best = null;
+      for (const hy of hyp) {
+        const f = boxFrac(ii, w, h, hy.x0, hy.cy - 0.42 * d, hy.x1, hy.cy + 0.42 * d);
+        if (f >= 0.35 && f <= 0.95 && (!best || f > best.f)) best = { f, cx: hy.cx, cy: hy.cy };
+      }
+      if (best) cands.push({ cx: best.cx, cy: best.cy, hollow: true });
+    }
+  }
+  // Hollow chords: outlined heads stacked a whole space apart, one above or below a hollow head already found.
+  for (const c0 of cands.slice()) {
+    if (!c0.hollow) continue;
+    for (const sg of [-1, 1]) {
+      for (let k = 1; k <= 3; k++) {
+        const cy = c0.cy + sg * k * d;
+        const f = boxFrac(ii, w, h, c0.cx - 0.55 * d, cy - 0.38 * d, c0.cx + 0.55 * d, cy + 0.38 * d);
+        const cen = boxFrac(ii, w, h, c0.cx - 0.2 * d, cy - 0.12 * d, c0.cx + 0.2 * d, cy + 0.12 * d);
+        if (f >= 0.4 && f <= 0.85 && cen <= 0.5) cands.push({ cx: c0.cx, cy, hollow: true }); else break;
+      }
     }
   }
   // Drop duplicates.
@@ -331,35 +436,95 @@ function readStaff(bin, W, H, st, opt) {
   for (const c of cands) {
     if (!uniq.some(u => Math.abs(u.cx - c.cx) < 0.5 * d && Math.abs(u.cy - c.cy) < 0.5 * d)) uniq.push(c);
   }
+  // Solid "heads" sitting in a beam or on a long solid bar are joints, not notes.
+  const baseG = st.top + 4 * d;
+  const heads = uniq.filter(c => {
+    // Must sit on the staff or on ledger lines (checked on the original image, where ledger lines still exist).
+    const stp = Math.round((baseG - (y0 + c.cy)) / (d / 2));
+    if (stp < -6 || stp > 16) return false;
+    const need = [];
+    if (stp >= 10) for (let v = 10; v <= stp; v += 2) need.push(v);
+    else if (stp <= -2) for (let v = -2; v >= stp; v -= 2) need.push(v);
+    for (const v of need) {
+      const yy = Math.round(baseG - v * d / 2);
+      let hit = 0;
+      for (let k = -1; k <= 1; k++) for (const sx of [-0.85, -0.75, 0.75, 0.85]) {
+        const xx = Math.round(x0 + c.cx + sx * d);
+        if (xx >= 0 && xx < W && yy + k >= 0 && yy + k < H && bin[(yy + k) * W + xx]) hit++;
+      }
+      if (hit < 3) return false;
+    }
+    if (c.hollow) {
+      // A white gap between two thick beams is not a head: a head's outline is thin, a beam is not.
+      const cxr = Math.round(c.cx), cyr = Math.round(c.cy);
+      let up = 0, dn = 0;
+      while (cyr - up >= 0 && !m[(cyr - up) * w + cxr] && up < d) up++;
+      let a1 = 0; while (cyr - up - a1 >= 0 && m[(cyr - up - a1) * w + cxr]) a1++;
+      while (cyr + dn < h && !m[(cyr + dn) * w + cxr] && dn < d) dn++;
+      let b1 = 0; while (cyr + dn + b1 < h && m[(cyr + dn + b1) * w + cxr]) b1++;
+      if (a1 >= 0.42 * d && b1 >= 0.42 * d) return false;
+      return true;
+    }
+    // A blob where a stem meets a beam, with the real head at the other end of that stem, is not a head.
+    if (uniq.some(o => o !== c && Math.abs(o.cx - c.cx) < 1.25 * d && Math.abs(o.cy - c.cy) >= 2.0 * d && Math.abs(o.cy - c.cy) <= 4.6 * d)) {
+      let maxRun = 0;
+      for (let dy = -0.45; dy <= 0.45; dy += 0.15) {
+        const yy = Math.round(c.cy + dy * d);
+        if (yy < 0 || yy >= h) continue;
+        let a2 = Math.round(c.cx), b2 = a2;
+        if (!m[yy * w + a2]) continue;
+        while (a2 > 0 && m[yy * w + a2 - 1]) a2--;
+        while (b2 < w - 1 && m[yy * w + b2 + 1]) b2++;
+        maxRun = Math.max(maxRun, b2 - a2 + 1);
+      }
+      if (maxRun > 1.5 * d) return false;
+      const sideInk = Math.max(boxFrac(ii, w, h, c.cx + 0.9 * d, c.cy - 0.5 * d, c.cx + 1.7 * d, c.cy + 0.5 * d), boxFrac(ii, w, h, c.cx - 1.7 * d, c.cy - 0.5 * d, c.cx - 0.9 * d, c.cy + 0.5 * d));
+      if (sideInk > 0.3) return false;
+    }
+    const ry = Math.round(c.cy);
+    let a = Math.round(c.cx), b = a;
+    while (a > 0 && m[ry * w + a - 1]) a--;
+    while (b < w - 1 && m[ry * w + b + 1]) b++;
+    return b - a + 1 <= 1.65 * d;
+  });
   // Keep only the top note when several heads share a stem position (chords).
-  const single = [];
-  for (const c of uniq) {
-    const prev = single[single.length - 1];
-    if (prev && Math.abs(prev.cx - c.cx) < 0.6 * d) { if (c.cy < prev.cy) single[single.length - 1] = c; }
-    else single.push(c);
+  // Heads stacked on one stem form a chord. Every head is kept.
+  const single = heads;
+  const groups = [];
+  for (const c of heads) {
+    const g = groups.find(g => g.some(o => { const dx = Math.abs(o.cx - c.cx), dy = Math.abs(o.cy - c.cy); return (dx < 0.6 * d && dy < 4.2 * d) || (dx < 1.3 * d && dy <= 0.6 * d); }));
+    if (g) g.push(c); else groups.push([c]);
   }
   const base = st.top + 4 * d;
   const out = [];
-  for (const c of single) {
-    const step = Math.round((base - (y0 + c.cy)) / (d / 2));
-    if (step < -5 || step > (c.hollow ? 11 : 14)) continue;
-    const up = stemRun(m, w, h, c.cx, c.cy, d, -1);
-    const down = stemRun(m, w, h, c.cx, c.cy, d, 1);
+  const comps = labelComponents(m, w, h);
+  const stepOf = c => Math.round((base - (y0 + c.cy)) / (d / 2));
+  for (const grp of groups) {
+    // The head with the longest stem carries the rhythm.
+    let c = null, up = null, down = null, bestN = -1;
+    for (const o of grp) {
+      const u = stemRun(m, w, h, o.cx, o.cy, d, -1), dn = stemRun(m, w, h, o.cx, o.cy, d, 1);
+      if (Math.max(u.n, dn.n) > bestN) { bestN = Math.max(u.n, dn.n); c = o; up = u; down = dn; }
+    }
+    const step = stepOf(c);
+    if (grp.every(o => { const sp = stepOf(o); return sp < -5 || sp > (o.hollow ? 16 : 14); })) continue;
     const dir = up.n >= down.n ? -1 : 1;
     const stem = dir < 0 ? up : down;
     const hasStem = stem.n >= 2.2 * d;
+    const hol = grp.some(o => o.hollow);
+    if (!hol && !hasStem) continue;   // a solid blob with no stem is a beam joint or a mark, not a note
     let beats;
-    if (c.hollow) beats = hasStem ? 2 : 4;
+    if (hol) beats = hasStem ? 2 : 4;
     else {
       beats = 1;
       if (hasStem) {
         // Count flags/beams: ink runs along the stem, just beside it near the tip.
         const inward = dir < 0 ? 1 : -1;
-        const len = Math.round(Math.min(2.0 * d, stem.n - 1.0 * d));
+        const len = Math.round(Math.min(1.35 * d, stem.n - 1.0 * d));
         const ya = stem.end;
         // Keep only ink connected to the stem tip, so chord symbols and
         // lyrics near the tip are not mistaken for flags.
-        const rx = Math.round(1.2 * d);
+        const rx = Math.round(1.3 * d);
         const bx0 = Math.max(0, stem.x - rx), bx1 = Math.min(w - 1, stem.x + rx);
         const conn = new Set();
         const q = [];
@@ -384,11 +549,14 @@ function readStaff(bin, W, H, st, opt) {
         }
         let best = 0;
         for (const side of [1, -1]) {
+          // Flags hang on the right of a stem; on the left only a beam, which reaches the next note, counts
+          // (a chord letter touching the stem tip would look like a flag).
+          if (side < 0) { const xf = Math.round(stem.x - 1.15 * d); let reach = false; for (let k = 0; k <= len && !reach; k++) { const y = ya + inward * k; if (xf >= 0 && y >= 0 && y < h && conn.has(y * w + xf)) reach = true; } if (!reach) continue; }
           for (const off of [0.45, 0.65, 0.85]) {
             const x = Math.round(stem.x + side * off * d);
             if (x < 0 || x >= w) continue;
             let runs = 0, lastInk = -999;
-            const gapMin = Math.max(2, Math.round(0.18 * d));
+            const gapMin = Math.max(2, Math.round(0.1 * d));
             for (let k = 0; k <= len; k++) {
               const y = ya + inward * k;
               if (y < 0 || y >= h) break;
@@ -397,15 +565,98 @@ function readStaff(bin, W, H, st, opt) {
             if (runs > best) best = runs;
           }
         }
+        // Ink beyond the stem tip (a chord letter or lyric touching the stem) means those "flags" are really text.
+        const oa = dir < 0 ? stem.end - 0.8 * d : stem.end + 0.25 * d, ob = dir < 0 ? stem.end - 0.25 * d : stem.end + 0.8 * d;
+        const beyond = Math.max(boxFrac(ii, w, h, stem.x - 0.9 * d, oa, stem.x - 0.15 * d, ob), boxFrac(ii, w, h, stem.x + 0.15 * d, oa, stem.x + 0.9 * d, ob));
+        if (best === 1 && beyond >= 0.15) best = 0;
         beats = best >= 2 ? 0.25 : best === 1 ? 0.5 : 1;
       }
     }
-    for (const dy of [-0.5, 0, 0.5]) {
-      const core = boxFrac(ii, w, h, c.cx + 1.08 * d, c.cy + (dy - 0.12) * d, c.cx + 1.32 * d, c.cy + (dy + 0.12) * d);
-      const outer = boxFrac(ii, w, h, c.cx + 0.8 * d, c.cy + (dy - 0.4) * d, c.cx + 1.6 * d, c.cy + (dy + 0.4) * d);
-      if (core >= 0.75 && outer <= 0.4) { beats *= 1.5; break; }
+    const baseBeats = beats, flexible = !hol && hasStem;
+    let dotMul = 1;
+    dotted: for (const o of grp) for (const dy of [-0.5, 0, 0.5]) {
+      for (const dx of [1.0, 1.1, 1.2, 1.3, 1.4]) {
+        const core = boxFrac(ii, w, h, o.cx + (dx - 0.12) * d, o.cy + (dy - 0.12) * d, o.cx + (dx + 0.12) * d, o.cy + (dy + 0.12) * d);
+        const outer = boxFrac(ii, w, h, o.cx + 0.85 * d, o.cy + (dy - 0.4) * d, o.cx + 1.75 * d, o.cy + (dy + 0.4) * d);
+        // A dot is a small isolated spot; a barline or stem beside the note is a tall line.
+        const above = boxFrac(ii, w, h, o.cx + (dx - 0.12) * d, o.cy + (dy - 0.75) * d, o.cx + (dx + 0.12) * d, o.cy + (dy - 0.3) * d);
+        const below = boxFrac(ii, w, h, o.cx + (dx - 0.12) * d, o.cy + (dy + 0.3) * d, o.cx + (dx + 0.12) * d, o.cy + (dy + 0.75) * d);
+        if (core >= 0.7 && outer <= 0.45 && above < 0.5 && below < 0.5) { beats *= 1.5; dotMul = 1.5; break dotted; }
+      }
     }
-    out.push({ step, beats, x: x0 + c.cx, y: y0 + c.cy, d });
+    // Accidental just before each head: sharp, flat or natural.
+    const accidOf = c => {
+      let accid;
+      for (const ac of comps) {
+        const aw = ac.maxx - ac.minx + 1, ah = ac.maxy - ac.miny + 1;
+        if (ac.maxx > c.cx - 0.55 * d || ac.maxx < c.cx - 1.8 * d) continue;
+        if (ah < 1.8 * d || ah > 3.4 * d || aw < 0.4 * d || aw > 1.5 * d) continue;
+        if (c.cy < ac.miny - 0.4 * d || c.cy > ac.maxy + 0.4 * d) continue;
+        // vertical strokes: columns holding a long straight run
+        const strokes = [];
+        for (let x = ac.minx; x <= ac.maxx; x++) {
+          let run = 0, best = 0, bs = 0, be = 0, rs = 0;
+          for (let y = ac.miny; y <= ac.maxy; y++) {
+            if (m[y * w + x]) { if (!run) rs = y; run++; if (run > best) { best = run; bs = rs; be = y; } } else run = 0;
+          }
+          if (best >= 1.3 * d) {
+            const last = strokes[strokes.length - 1];
+            if (last && x - last.x1 <= 2) { last.x1 = x; last.y0 = Math.min(last.y0, bs); last.y1 = Math.max(last.y1, be); }
+            else strokes.push({ x0: x, x1: x, y0: bs, y1: be });
+          }
+        }
+        if (strokes.length === 1) accid = -1;
+        else if (strokes.length >= 2) accid = Math.abs(strokes[0].y0 - strokes[strokes.length - 1].y0) > 0.7 * d ? 0 : 1;
+        break;
+      }
+      return accid;
+    };
+    const heads2 = grp.map(o => ({ step: stepOf(o), accid: accidOf(o), cx: o.cx, cy: o.cy })).filter(o => o.step >= -5 && o.step <= 16).sort((p, q) => q.step - p.step);
+    const topH = heads2[0];
+    out.push({ step: topH.step, accid: topH.accid, heads: heads2, beats, flexible, baseBeats, dotMul, x: x0 + topH.cx, y: y0 + topH.cy, d, lx: topH.cx, ly: topH.cy, dir: hasStem ? dir : 0 });
+  }
+
+  // Rests: isolated shapes inside the staff that are not heads, stems or accidentals.
+  const topY = st.top - y0, botY = st.top + 4 * d - y0;
+  const line2 = st.top + d - y0, line3 = st.top + 2 * d - y0;
+  for (const c of comps) {
+    const bw = c.maxx - c.minx + 1, bh = c.maxy - c.miny + 1;
+    if (c.miny < topY - 0.25 * d || c.maxy > botY + 0.25 * d) continue;
+    if (c.n < 0.15 * d * d) continue;
+    // Not part of a note, and not an accidental standing just before a head.
+    if (single.some(s2 => s2.cx >= c.minx - 0.6 * d && s2.cx <= c.maxx + 0.6 * d && s2.cy >= c.miny - 0.6 * d && s2.cy <= c.maxy + 0.6 * d)) continue;
+    if (single.some(s2 => s2.cx - c.maxx >= -0.2 * d && s2.cx - c.maxx <= 1.4 * d && s2.cy >= c.miny - 0.7 * d && s2.cy <= c.maxy + 0.7 * d)) continue;
+    // Not a stem: rests have no long straight vertical stroke.
+    let longest = 0;
+    for (let x = c.minx; x <= c.maxx; x++) {
+      let run = 0;
+      for (let y = c.miny; y <= c.maxy; y++) { if (m[y * w + x]) { run++; if (run > longest) longest = run; } else run = 0; }
+    }
+    if (longest >= 2.0 * d) continue;
+    let beats = 0;
+    if (bw >= 0.7 * d && bw <= 1.7 * d && bh >= 0.25 * d && bh <= 0.9 * d && c.n >= 0.7 * bw * bh) {
+      if (Math.abs(c.maxy - line3) < 0.35 * d) beats = 2;        // half rest sits on the 3rd line
+      else if (Math.abs(c.miny - line2) < 0.35 * d) beats = 4;   // whole rest hangs from the 2nd line
+    } else if (bw >= 0.5 * d && bw <= 1.5 * d) {
+      if (bh >= 2.2 * d && bh <= 3.5 * d) beats = 1;             // quarter rest
+      else if (bh >= 1.3 * d && bh < 2.2 * d) beats = 0.5;       // eighth rest
+    }
+    if (!beats) continue;
+    // A dot right after the rest makes it longer by half.
+    const cyR = (c.miny + c.maxy) / 2;
+    if (boxFrac(ii, w, h, c.maxx + 0.25 * d, cyR - 0.55 * d, c.maxx + 0.85 * d, cyR + 0.05 * d) >= 0.6 && beats < 4) beats *= 1.5;
+    out.push({ rest: true, beats, x: x0 + (c.minx + c.maxx) / 2, y: y0 + cyR, d, step: 0 });
+  }
+  out.sort((a, b) => a.x - b.x);
+
+  // Ties: same pitch, next to each other, joined by an arc.
+  for (let i = 0; i + 1 < out.length; i++) {
+    const a = out[i], b = out[i + 1];
+    if (a.rest || b.rest) continue;
+    for (const ha of a.heads) {
+      const hb = b.heads.find(o => o.step === ha.step);
+      if (hb && hasTie(m, w, h, { cx: ha.cx, cy: ha.cy }, { cx: hb.cx, cy: hb.cy }, d)) { a.tie = true; break; }
+    }
   }
   return out;
 }
@@ -417,7 +668,7 @@ function findBarlines(bin, W, H, st, skip) {
   for (let x = xa; x <= st.x1; x++) {
     let ink = 0, tot = 0;
     for (let y = top + Math.round(0.3 * d); y <= bot - Math.round(0.3 * d); y++) { tot++; ink += bin[y * W + x]; }
-    if (ink < tot * 0.97) continue;
+    if (ink < tot * 0.9) continue;
     let out = 0;
     for (let k = 1; k <= Math.round(0.5 * d); k++) out += bin[(top - Math.round(0.3 * d) - k) * W + x] + bin[(bot + Math.round(0.3 * d) + k) * W + x];
     if (out > 1) continue;
@@ -433,11 +684,55 @@ function findBarlines(bin, W, H, st, skip) {
 
 // Fix triplets: when a bar holds more beats than it should, turn runs of
 // three equal short notes into triplets until the bar adds up.
-function fixMeasure(ms, target) {
+// Flags are the least certain thing on the page (a chord letter can touch a flag, a thin second flag can fade).
+// When a bar does not add up, find the fewest flag-count changes that make it add up.
+function fixFlex(ms, target) {
+  const idx = [];
+  ms.forEach((n, i) => { if (n.flexible && n.baseBeats) idx.push(i); });
+  if (!idx.length || idx.length > 14) return false;
+  const lv = b => (b >= 1 ? 0 : b >= 0.5 ? 1 : 2);
+  const BASE = [1, 0.5, 0.25];
+  const fixedSum = ms.reduce((t, n, i) => t + (idx.includes(i) ? 0 : n.beats), 0);
+  for (let budget = 1; budget <= 3; budget++) {
+    let best = null, bestScore = 1e9;
+    (function dfs(k, left, sum, ch) {
+      if (k === idx.length) {
+        if (Math.abs(sum - target) > 1e-6 || !ch.some(c => c.cost) || ch.reduce((t, c) => t + c.cost, 0) !== budget) return;
+        // Of equally small fixes, prefer the one where sixteenths come in pairs and beat-groups look natural.
+        const base = ms.map(n => n.beats);
+        ch.forEach(c => { base[c.i] = BASE[c.f] * ms[c.i].dotMul; });
+        let sc = 0;
+        base.forEach((b, i) => { if (b === 0.25 && base[i - 1] !== 0.25 && base[i + 1] !== 0.25) sc += 2; });
+        if (sc < bestScore) { bestScore = sc; best = ch.slice(); }
+        return;
+      }
+      const n = ms[idx[k]], f0 = lv(n.baseBeats);
+      for (const f of [f0, f0 + 1, f0 - 1, f0 + 2, f0 - 2]) {
+        if (f < 0 || f > 2) continue;
+        const cost = Math.abs(f - f0);
+        if (cost > left) continue;
+        ch.push({ i: idx[k], f, cost });
+        dfs(k + 1, left - cost, sum + BASE[f] * n.dotMul, ch);
+        ch.pop();
+      }
+    })(0, budget, fixedSum, []);
+    if (best) {
+      for (const c of best) if (c.cost) { ms[c.i].baseBeats = BASE[c.f]; ms[c.i].beats = BASE[c.f] * ms[c.i].dotMul; }
+      return true;
+    }
+  }
+  return false;
+}
+
+function fixMeasure(ms, target, keepShort) {
   const sum = a => a.reduce((s, n) => s + n.beats, 0);
   const S = sum(ms);
   const excess = S - target;
-  if (excess < 0.2) return true;
+  if (Math.abs(excess) < 0.01) return true;
+  if (excess < 0.2 && keepShort) return true;
+  if (target > 0 && S > target && Math.abs(S / target - Math.round(S / target)) < 0.01) return true;   // a barline was missed: whole bars still add up
+  // Bars with sixteenths are more likely to hold a missed flag than a triplet.
+  if (excess > 0.19 && ms.some(n => n.beats === 0.25) && fixFlex(ms, target)) return true;
   const wins = [];
   for (let i = 0; i + 2 < ms.length; i++) {
     const b = ms[i].beats;
@@ -454,9 +749,12 @@ function fixMeasure(ms, target) {
       chosen.push(w); dfs(j + 1, chosen, red + w.red); chosen.pop();
     }
   })(0, [], 0);
-  if (!found) return false;
-  for (const w of found) for (let k = 0; k < 3; k++) ms[w.i + k].beats = w.b * 2 / 3;
-  return true;
+  if (found) {
+    for (const w of found) for (let k = 0; k < 3; k++) ms[w.i + k].beats = w.b * 2 / 3;
+    return true;
+  }
+  if (fixFlex(ms, target)) return true;
+  return excess < 0.2;
 }
 
 function analyzeBinary(bin, W, H, opt) {
@@ -464,6 +762,7 @@ function analyzeBinary(bin, W, H, opt) {
   const used = [];
   const notes = [];
   let badBars = 0, bars = 0;
+  const sums = [];
   all.forEach((st, i) => {
     if (opt.mode === 'odd' && i % 2 !== 0) return;
     if (opt.mode === 'even' && i % 2 !== 1) return;
@@ -472,25 +771,114 @@ function analyzeBinary(bin, W, H, opt) {
     const shift = opt.clef === 'treble8' ? -12 : 0;
     const acc = keyAccidentals(opt.key);
     // The very first staff also carries the time signature, so skip a bit more there.
-    const sopt = Object.assign({}, opt, { skip: opt.skip + (i === 0 && opt.first ? 3 : 0) });
-    const staffNotes = readStaff(bin, W, H, st, sopt).map(n => ({ midi: midiFromDia(baseDia + n.step, acc, shift), beats: n.beats, x: n.x, y: n.y, d: n.d, staff: used.length - 1 }));
-    if (opt.measure) {
-      const lines = findBarlines(bin, W, H, st, sopt.skip);
+    const baseSkip = opt.skip || (4.4 + 1.25 * Math.abs(opt.key || 0));   // clef plus key signature
+    const sopt = Object.assign({}, opt, { skip: baseSkip + (i === 0 && opt.first ? 3 : 0) });
+    const raw = readStaff(bin, W, H, st, sopt);
+    // A "barline" right beside a note head is really that note's stem.
+    const lines = findBarlines(bin, W, H, st, sopt.skip).filter(bx => !raw.some(n => !n.rest && Math.abs(n.x - bx) < 0.95 * st.d));
+    const barOf = x => { let g = 0; while (g < lines.length && lines[g] < x) g++; return g; };
+    let curBar = -1, over = new Map();
+    const staffNotes = raw.map(n => {
+      let midi = null, more = [];
+      if (!n.rest) {
+        const b = barOf(n.x);
+        if (b !== curBar) { curBar = b; over = new Map(); }
+        const ms = n.heads.map(hd => {
+          const dia = baseDia + hd.step, li = ((dia % 7) + 7) % 7;
+          if (hd.accid !== undefined) over.set(dia, hd.accid);
+          const a = over.has(dia) ? over.get(dia) : acc[li];
+          return 12 * (Math.floor(dia / 7) + 1) + SEMI[li] + a + shift;
+        });
+        midi = ms[0]; more = ms.slice(1);
+      }
+      return { midi, more, rest: !!n.rest, tie: !!n.tie, beats: n.beats, flexible: !!n.flexible, baseBeats: n.baseBeats, dotMul: n.dotMul, x: n.x, y: n.y, d: n.d, staff: used.length - 1 };
+    });
+    {
       const groups = [];
       for (const n of staffNotes) {
         let g = 0;
         while (g < lines.length && lines[g] < n.x) g++;
         (groups[g] = groups[g] || []).push(n);
       }
-      for (const ms of groups) {
-        if (!ms) continue;
-        bars++;
-        if (!fixMeasure(ms, opt.measure)) badBars++;
-      }
+      const gl = groups.length - 1;
+      groups.forEach((ms, gi) => {
+        if (!ms) return;
+        sums.push(ms.reduce((t, n) => t + n.beats, 0));
+        // A short first bar (pickup) or last bar is normal.
+        const keepShort = (i === 0 && gi === groups.findIndex(g => g)) || (i === all.length - 1 && gi === gl) || gi === gl && !lines.length;
+        if (opt.measure) { bars++; if (!fixMeasure(ms, opt.measure, keepShort)) badBars++; }
+      });
     }
-    notes.push(...staffNotes);
+    // A whole rest means "the whole bar", whatever the time signature.
+    if (opt.measure) for (const n of staffNotes) if (n.rest && n.beats === 4) n.beats = opt.measure;
+    // Join tied notes into one long note.
+    const merged = [];
+    for (const n of staffNotes) {
+      const last = merged[merged.length - 1];
+      if (last && last.tie && !n.rest && n.midi === last.midi && (last.more || []).join() === (n.more || []).join()) { last.beats += n.beats; last.tie = n.tie; }
+      else merged.push(n);
+    }
+    notes.push(...merged);
   });
-  return { staves: used, notes, bars, badBars };
+  return { staves: used, notes, bars, badBars, sums };
+}
+
+// Most bars add up to the bar length, so the time signature can be guessed from the bar totals.
+function pickMeter(sums) {
+  let best = 4, bestN = -1;
+  for (const c of [4, 3, 2]) {
+    const n = sums.filter(v => Math.abs(v - c) < 0.01).length;
+    if (n > bestN) { best = c; bestN = n; }
+  }
+  return best;
+}
+
+// Key signature: the run of sharps or flats right after the clef (read on the 2nd staff when there is one,
+// because the 1st staff also carries the time signature).
+function detectKey(bin, W, H, staves) {
+  const st = staves.length > 1 ? staves[1] : staves[0];
+  if (!st) return 0;
+  const d = st.d;
+  const ya = Math.max(0, Math.round(st.top - 1.6 * d)), yb = Math.min(H - 1, Math.round(st.top + 5.6 * d));
+  const xa = Math.max(0, Math.round(st.x0 + 0.3 * d)), xb = Math.min(W - 1, Math.round(st.x0 + 14 * d));
+  const w = xb - xa + 1, h = yb - ya + 1;
+  if (w < 4 * d || h < 4 * d) return 0;
+  const m = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) m[y * w + x] = bin[(y + ya) * W + x + xa];
+  const t = Math.max(1, Math.round(st.t));
+  for (let k = 0; k <= 4; k++) {
+    const s0 = Math.round(st.top + k * d - (t - 1) / 2) - ya, e0 = s0 + t - 1;
+    if (s0 - 2 < 0 || e0 + 2 >= h) continue;
+    for (let x = 0; x < w; x++) if (!m[(s0 - 2) * w + x] && !m[(e0 + 2) * w + x]) for (let y = s0 - 1; y <= e0 + 1; y++) m[y * w + x] = 0;
+  }
+  const comps = labelComponents(m, w, h).sort((p, q) => p.minx - q.minx);
+  let i = 0, prevR = -1;
+  while (i < comps.length && (comps[i].maxy - comps[i].miny + 1 > 3.7 * d || comps[i].maxx - comps[i].minx + 1 > 2.4 * d)) { prevR = Math.max(prevR, comps[i].maxx); i++; }
+  const found = [];
+  for (; i < comps.length; i++) {
+    const c = comps[i];
+    const hg = c.maxy - c.miny + 1, wd = c.maxx - c.minx + 1;
+    if (hg > 3.7 * d || c.minx <= prevR) continue;   // a barline, or a loose piece inside the clef
+    const gap = c.minx - (found.length ? found[found.length - 1].maxx : prevR);
+    if (found.length ? gap > 1.7 * d : gap > 2.6 * d) break;
+    if (hg < 1.6 * d || hg > 3.4 * d || wd < 0.35 * d || wd > 1.5 * d) break;
+    // strokes: columns with a straight vertical run
+    const strokes = [];
+    let longest = 0;
+    for (let x = c.minx; x <= c.maxx; x++) {
+      let run = 0, best = 0;
+      for (let y = c.miny; y <= c.maxy; y++) { if (m[y * w + x]) { run++; if (run > best) best = run; } else run = 0; }
+      if (best > longest) longest = best;
+      if (best >= 1.3 * d) { const last = strokes[strokes.length - 1]; if (last && x - last.x1 <= 2) last.x1 = x; else strokes.push({ x1: x }); }
+    }
+    if (longest < 1.3 * d) break;
+    const flat = strokes.length === 1;
+    if (found.length && found[0].flat !== flat) break;
+    found.push({ maxx: c.maxx, flat });
+    if (found.length === 7) break;
+  }
+  if (!found.length) return 0;
+  return found[0].flat ? -found.length : found.length;
 }
 // ==OMR-END==
 
@@ -502,16 +890,20 @@ const DURS = [[0.25, 'sixteenth'], [1 / 3, 'eighth triplet'], [2 / 3, 'quarter t
 const NAMES_S = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const NAMES_F = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const LETTER = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const MAJORS = ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
+const MINORS = ['Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#'];
 
 let pdfDoc = null, baseName = 'melody';
 let pages = [];   // {canvas, overlay, staves}
 let notes = [];   // {midi|null, beats, page, x, y, d}
 let selected = -1;
-let audioCtx = null, playSrc = null, mp3Url = null, mp3Blob = null;
+let audioCtx = null, playSrc = null, mp3Url = null, midiUrl = null, mp3Blob = null;
+let usedKey = 0, usedMinor = false, usedMeter = { num: 4, den: 4 };
 
+const tick = () => new Promise(r => setTimeout(r, 15));
 function setStatus(id, text, cls) { const el = $(id); el.textContent = text || ''; el.className = 'status' + (cls ? ' ' + cls : ''); }
-const flatKey = () => parseInt($('key').value, 10) < 0;
-function midiName(m) { if (m == null) return 'R'; return (flatKey() ? NAMES_F : NAMES_S)[m % 12] + (Math.floor(m / 12) - 1); }
+function chordName(n) { return n.midi == null ? 'R' : [n.midi, ...(n.more || [])].map(midiName).join(' '); }
+function midiName(m) { if (m == null) return 'R'; return (usedKey < 0 ? NAMES_F : NAMES_S)[m % 12] + (Math.floor(m / 12) - 1); }
 function parseName(s) {
   s = s.trim().replace('♯', '#').replace('♭', 'b');
   if (/^(r|rest)$/i.test(s)) return null;
@@ -520,18 +912,20 @@ function parseName(s) {
   const midi = 12 * (parseInt(mt[3], 10) + 1) + LETTER[mt[1].toUpperCase()] + (mt[2] === '#' ? 1 : mt[2] === 'b' ? -1 : 0);
   return (midi >= 24 && midi <= 108) ? midi : undefined;
 }
+const tempo = () => Math.min(240, Math.max(30, parseFloat($('bpm').value) || 80));
 
 $('file').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
   baseName = f.name.replace(/\.pdf$/i, '') || 'melody';
   setStatus('status1', 'Opening the PDF…');
-  $('readBtn').disabled = true;
-  $('reviewCard').classList.add('hidden');
+  $('convertBtn').disabled = true;
+  $('resultCard').classList.add('hidden');
+  setStatus('status2', '');
   try {
     pdfDoc = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
     setStatus('status1', f.name + ' · ' + pdfDoc.numPages + ' page' + (pdfDoc.numPages > 1 ? 's' : ''), 'ok');
-    $('readBtn').disabled = false;
+    $('convertBtn').disabled = false;
   } catch (err) {
     pdfDoc = null;
     setStatus('status1', 'Could not open this PDF. Try another file.', 'warn');
@@ -545,7 +939,7 @@ async function renderPages() {
   for (let p = 1; p <= pdfDoc.numPages; p++) {
     const page = await pdfDoc.getPage(p);
     const base = page.getViewport({ scale: 1 });
-    const scale = Math.min(4, 1700 / base.width);
+    const scale = Math.min(4, 2400 / base.width);
     const vp = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
@@ -563,48 +957,69 @@ async function renderPages() {
   }
 }
 
-$('readBtn').addEventListener('click', async () => {
+$('convertBtn').addEventListener('click', async () => {
   if (!pdfDoc) return;
-  $('readBtn').disabled = true;
+  $('convertBtn').disabled = true;
   stopPlay();
-  setStatus('status2', 'Reading the page…');
+  $('resultCard').classList.add('hidden');
   try {
-    await new Promise(r => setTimeout(r, 30));
+    setStatus('status2', 'Reading the PDF…');
+    await tick();
     await renderPages();
+    const keySel = $('key').value, tsSel = $('ts').value;
+    let key = keySel === 'auto' ? null : parseInt(keySel, 10);
+    let measure = tsSel === 'auto' ? null : tsSel === '6/8' ? 3 : (parseFloat(tsSel) || 0);
     const opt = {
-      clef: $('clef').value,
-      key: parseInt($('key').value, 10),
-      skip: Math.min(14, Math.max(2, parseFloat($('skip').value) || 7)),
-      mode: $('mode').value,
-      measure: parseFloat($('ts').value) || 0,
-      first: false
+      clef: $('clef').value, key: key == null ? 0 : key,
+      skip: parseFloat($('skip').value) > 0 ? Math.min(14, Math.max(2, parseFloat($('skip').value))) : 0,
+      mode: $('mode').value, measure: measure == null ? 0 : measure, first: false
     };
     notes = [];
     let staffCount = 0, bars = 0, badBars = 0;
     for (let i = 0; i < pages.length; i++) {
-      setStatus('status2', 'Reading notes, page ' + (i + 1) + ' of ' + pages.length + '…');
-      await new Promise(r => setTimeout(r, 10));
-      const cv = pages[i].canvas;
-      const img = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      setStatus('status2', 'Reading the notes, page ' + (i + 1) + ' of ' + pages.length + '…');
+      await tick();
+      const cv = pages[i].canvas, W = cv.width, H = cv.height;
+      const img = cv.getContext('2d').getImageData(0, 0, W, H).data;
+      const bin = toBinary(img, W, H);
+      if (key === null) { const sv = findStaves(bin, W, H); if (sv.length) key = detectKey(bin, W, H, sv); }
+      opt.key = key == null ? 0 : key;
       opt.first = (i === 0);
-      const res = analyzeBinary(toBinary(img, cv.width, cv.height), cv.width, cv.height, opt);
+      if (measure === null) {
+        const r0 = analyzeBinary(bin, W, H, Object.assign({}, opt, { measure: 0 }));
+        if (r0.sums.length) measure = pickMeter(r0.sums);
+      }
+      opt.measure = measure == null ? 0 : measure;
+      const res = analyzeBinary(bin, W, H, opt);
       pages[i].staves = res.staves;
       staffCount += res.staves.length; bars += res.bars; badBars += res.badBars;
-      // Notes from a page come in staff order, left to right.
-      res.notes.forEach(n => notes.push({ midi: n.midi, beats: n.beats, page: i, x: n.x, y: n.y, d: n.d }));
+      res.notes.forEach(n => notes.push({ midi: n.midi, more: n.more || [], beats: n.beats, page: i, x: n.x, y: n.y, d: n.d }));
     }
-    $('reviewCard').classList.remove('hidden');
+    if (!staffCount) { setStatus('status2', 'No staff lines found. Is this a scanned or photographed page? It works best with computer-made PDFs.', 'warn'); $('convertBtn').disabled = false; return; }
+    if (!notes.some(n => n.midi != null)) { setStatus('status2', 'Found ' + staffCount + ' staves but no notes. Try "Skip at the start" in Advanced settings.', 'warn'); $('convertBtn').disabled = false; return; }
+    usedKey = key == null ? 0 : key;
+    const beatsPerBar = measure || 4;
+    usedMeter = tsSel === '6/8' ? { num: 6, den: 8 } : { num: beatsPerBar, den: 4 };
+    // Minor or major: a tune usually ends on its home note.
+    const last = [...notes].reverse().find(n => n.midi != null);
+    const majPc = (((usedKey * 7) % 12) + 12) % 12;
+    usedMinor = last ? (last.midi % 12) === (majPc + 9) % 12 : false;
     selected = -1;
     buildList(); drawOverlays();
-    $('reviewCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (!staffCount) setStatus('status2', 'No staff lines found. Is this a scanned or photographed page? It works best with computer-made PDFs.', 'warn');
-    else if (!notes.length) setStatus('status2', 'Found ' + staffCount + ' staves but no notes. Try changing "Skip at the start" in More options.', 'warn');
-    else setStatus('status2', 'Read ' + notes.length + ' notes from ' + staffCount + ' staves.' + (badBars ? ' ' + badBars + ' of ' + bars + ' bars do not add up (often rests, ties or two voices). Please check the notes below.' : ' Please check them below.'), badBars ? 'warn' : 'ok');
+    setStatus('status2', 'Making the MP3 and MIDI…');
+    await tick();
+    await buildOutputs();
+    const kname = usedMinor ? MINORS[usedKey + 7] + ' minor' : MAJORS[usedKey + 7] + ' major';
+    const sumTxt = notes.length + ' notes and rests from ' + staffCount + ' staves · ' + (tsSel === '6/8' ? '6/8' : usedMeter.num + '/4') + ' · key of ' + kname + (keySel === 'auto' ? ' (found automatically)' : '') + ' · ' + tempo() + ' beats per minute';
+    $('summary').textContent = sumTxt;
+    $('resultCard').classList.remove('hidden');
+    $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setStatus('status2', badBars ? 'Done. ' + badBars + ' of ' + bars + ' bars do not add up, so check the notes if it sounds off.' : 'Done.', badBars ? 'warn' : 'ok');
   } catch (err) {
     console.error(err);
-    setStatus('status2', 'Something went wrong while reading the page.', 'warn');
+    setStatus('status2', 'Something went wrong while reading the PDF.', 'warn');
   }
-  $('readBtn').disabled = false;
+  $('convertBtn').disabled = false;
 });
 
 function drawOverlays() {
@@ -620,7 +1035,7 @@ function drawOverlays() {
       ctx.beginPath(); ctx.arc(n.x, n.y, n.d * (sel ? 0.9 : 0.7), 0, Math.PI * 2); ctx.stroke();
       ctx.font = 'bold ' + Math.round(n.d * 0.85) + 'px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(n.midi == null ? 'R' : midiName(n.midi), n.x, n.y + n.d * 2.0);
+      ctx.fillText(chordName(n), n.x, n.y + n.d * 2.0);
     });
   });
 }
@@ -633,15 +1048,18 @@ function buildList() {
     row.className = 'note' + (i === selected ? ' sel' : '');
     const num = document.createElement('div'); num.className = 'n'; num.textContent = i + 1;
     const name = document.createElement('input');
-    name.type = 'text'; name.value = midiName(n.midi); name.autocapitalize = 'characters'; name.autocomplete = 'off';
+    name.type = 'text'; name.value = chordName(n); name.autocapitalize = 'characters'; name.autocomplete = 'off';
     name.addEventListener('focus', () => select(i, row));
     name.addEventListener('change', () => {
-      const v = parseName(name.value);
-      if (v === undefined) { name.value = midiName(n.midi); return; }
-      n.midi = v; name.value = midiName(v); drawOverlays();
+      const parts = name.value.trim().split(/[\s,+]+/).filter(Boolean);
+      const vs = parts.map(parseName);
+      if (!vs.length || vs.some(v => v === undefined) || (vs.length > 1 && vs.some(v => v === null))) { name.value = chordName(n); return; }
+      n.midi = vs[0]; n.more = vs.slice(1); name.value = chordName(n); drawOverlays();
     });
     const dur = document.createElement('select');
-    DURS.forEach(([b, label]) => { const o = document.createElement('option'); o.value = b; o.textContent = label; if (Math.abs(b - n.beats) < 1e-3) o.selected = true; dur.append(o); });
+    let hit = false;
+    DURS.forEach(([b, label]) => { const o = document.createElement('option'); o.value = b; o.textContent = label; if (Math.abs(b - n.beats) < 1e-3) { o.selected = true; hit = true; } dur.append(o); });
+    if (!hit) { const o = document.createElement('option'); o.value = n.beats; o.textContent = (Math.round(n.beats * 100) / 100) + ' beats'; o.selected = true; dur.append(o); }
     dur.addEventListener('focus', () => select(i, row));
     dur.addEventListener('change', () => { n.beats = parseFloat(dur.value); });
     const del = document.createElement('button'); del.className = 'sec'; del.textContent = '✕'; del.title = 'Delete';
@@ -662,8 +1080,7 @@ function select(i, row) {
 
 // ---------- Sound ----------
 function synth(sr) {
-  const bpm = Math.min(240, Math.max(30, parseFloat($('bpm').value) || 90));
-  const spb = 60 / bpm;
+  const spb = 60 / tempo();
   let total = 0;
   notes.forEach(n => total += n.beats * spb);
   const out = new Float32Array(Math.ceil((total + 0.6) * sr));
@@ -671,8 +1088,8 @@ function synth(sr) {
   let t = 0;
   for (const n of notes) {
     const dur = n.beats * spb;
-    if (n.midi != null) {
-      const f = 440 * Math.pow(2, (n.midi - 69) / 12);
+    if (n.midi != null) for (const pm of [n.midi, ...(n.more || [])]) {
+      const f = 440 * Math.pow(2, (pm - 69) / 12);
       const start = Math.floor(t * sr);
       const len = Math.min(out.length - start, Math.floor((dur + 0.12) * sr));
       const decay = 2.2 / Math.max(dur, 0.35);
@@ -694,6 +1111,64 @@ function synth(sr) {
   const g = peak > 0 ? 0.89 / peak : 1;
   for (let i = 0; i < out.length; i++) out[i] *= g;
   return out;
+}
+
+// ---------- MIDI file ----------
+function buildMidi() {
+  const PPQ = 480;
+  const vlq = v => { const o = [v & 0x7f]; v >>= 7; while (v) { o.push((v & 0x7f) | 0x80); v >>= 7; } return o.reverse(); };
+  const ev = [];
+  let t = 0;
+  for (const n of notes) {
+    const d = Math.round(n.beats * PPQ);
+    if (n.midi != null) for (const pm of [n.midi, ...(n.more || [])]) { ev.push([t, 1, [0x90, pm, 80]]); ev.push([t + d, 0, [0x80, pm, 0]]); }
+    t += d;
+  }
+  ev.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const trk = [];
+  const meta = (type, data) => { trk.push(0, 0xff, type, ...vlq(data.length), ...data); };
+  meta(0x03, Array.from(new TextEncoder().encode(baseName)));
+  const dd = Math.round(Math.log2(usedMeter.den));
+  meta(0x58, [usedMeter.num, dd, usedMeter.den === 8 ? 36 : 24, 8]);
+  meta(0x59, [usedKey & 0xff, usedMinor ? 1 : 0]);
+  const mpq = Math.round(60000000 / tempo());
+  meta(0x51, [(mpq >> 16) & 0xff, (mpq >> 8) & 0xff, mpq & 0xff]);
+  trk.push(0, 0xc0, 0);   // acoustic grand piano
+  let last = 0;
+  for (const [tick, , data] of ev) { trk.push(...vlq(tick - last), ...data); last = tick; }
+  trk.push(0, 0xff, 0x2f, 0);
+  const u32 = v => [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255];
+  const bytes = [0x4d, 0x54, 0x68, 0x64, ...u32(6), 0, 0, 0, 1, (PPQ >> 8) & 255, PPQ & 255, 0x4d, 0x54, 0x72, 0x6b, ...u32(trk.length), ...trk];
+  return new Blob([new Uint8Array(bytes)], { type: 'audio/midi' });
+}
+
+async function buildOutputs() {
+  const sr = 44100;
+  const data = synth(sr);
+  const pcm = new Int16Array(data.length);
+  for (let i = 0; i < data.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(data[i] * 32767)));
+  const enc = new lamejs.Mp3Encoder(1, sr, 128);
+  const parts = [];
+  for (let i = 0, c = 0; i < pcm.length; i += 1152, c++) {
+    const b = enc.encodeBuffer(pcm.subarray(i, i + 1152));
+    if (b.length) parts.push(b);
+    if (c % 300 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  const end = enc.flush();
+  if (end.length) parts.push(end);
+  mp3Blob = new Blob(parts, { type: 'audio/mpeg' });
+  if (mp3Url) URL.revokeObjectURL(mp3Url);
+  mp3Url = URL.createObjectURL(mp3Blob);
+  $('player').src = mp3Url;
+  $('dl').href = mp3Url;
+  $('dl').download = baseName + '.mp3';
+  const midiBlob = buildMidi();
+  if (midiUrl) URL.revokeObjectURL(midiUrl);
+  midiUrl = URL.createObjectURL(midiBlob);
+  $('dlMidi').href = midiUrl;
+  $('dlMidi').download = baseName + '.mid';
+  const file = new File([mp3Blob], baseName + '.mp3', { type: 'audio/mpeg' });
+  $('shareBtn').classList.toggle('hidden', !(navigator.canShare && navigator.canShare({ files: [file] })));
 }
 
 function stopPlay() {
@@ -720,41 +1195,20 @@ $('playBtn').addEventListener('click', () => {
   setStatus('status3', '');
 });
 
-$('mp3Btn').addEventListener('click', async () => {
+$('updateBtn').addEventListener('click', async () => {
   if (!notes.some(n => n.midi != null)) { setStatus('status3', 'There are no notes to make into an MP3.', 'warn'); return; }
   stopPlay();
-  $('mp3Btn').disabled = true;
-  setStatus('status3', 'Making the MP3…');
-  await new Promise(r => setTimeout(r, 30));
+  $('updateBtn').disabled = true;
+  setStatus('status3', 'Updating…');
+  await tick();
   try {
-    const sr = 44100;
-    const data = synth(sr);
-    const pcm = new Int16Array(data.length);
-    for (let i = 0; i < data.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(data[i] * 32767)));
-    const enc = new lamejs.Mp3Encoder(1, sr, 128);
-    const parts = [];
-    for (let i = 0, c = 0; i < pcm.length; i += 1152, c++) {
-      const b = enc.encodeBuffer(pcm.subarray(i, i + 1152));
-      if (b.length) parts.push(b);
-      if (c % 300 === 0) await new Promise(r => setTimeout(r, 0));
-    }
-    const end = enc.flush();
-    if (end.length) parts.push(end);
-    mp3Blob = new Blob(parts, { type: 'audio/mpeg' });
-    if (mp3Url) URL.revokeObjectURL(mp3Url);
-    mp3Url = URL.createObjectURL(mp3Blob);
-    $('player').src = mp3Url;
-    $('dl').href = mp3Url;
-    $('dl').download = baseName + '.mp3';
-    $('result').classList.remove('hidden');
-    const file = new File([mp3Blob], baseName + '.mp3', { type: 'audio/mpeg' });
-    $('shareBtn').classList.toggle('hidden', !(navigator.canShare && navigator.canShare({ files: [file] })));
-    setStatus('status3', 'Your MP3 is ready.', 'ok');
+    await buildOutputs();
+    setStatus('status3', 'Updated. The player and download buttons above now use your changes.', 'ok');
   } catch (err) {
     console.error(err);
-    setStatus('status3', 'Could not make the MP3.', 'warn');
+    setStatus('status3', 'Could not update the files.', 'warn');
   }
-  $('mp3Btn').disabled = false;
+  $('updateBtn').disabled = false;
 });
 
 $('shareBtn').addEventListener('click', async () => {
