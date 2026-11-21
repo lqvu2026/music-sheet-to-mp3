@@ -13,14 +13,19 @@ Turn a PDF music sheet into a melody **MP3** and a **MIDI** file. Everything run
 
 - Notes from whole to sixteenth, dotted notes, triplets
 - Every note of a chord (notes stacked on one stem), played together
+- Two voices on one staff (an upper voice with stems up and a lower voice with stems down): each voice keeps its own rhythm, and held notes are shown in brackets in the note list
 - Rests, ties, sharps, flats and naturals (they last to the end of the bar)
 - Key signature and time signature (2/4, 3/4, 4/4 are found automatically)
 - Bars that do not add up are repaired when there is one clear fix (for example a missed flag)
 
+## Key changes and triplets
+
+With the key on Auto, each line is read on its own, and a new key signature after a barline (for example a chorus that goes from A minor to A major) is picked up. A small "3" over or under a beam turns the three notes into a triplet.
+
 ## Limits
 
 - Best with computer-made PDFs (sheets from notation software). Scans and photos work less well.
-- It plays one line of rhythm. When two voices on the same staff move at different speeds, they are read as one chord rhythm, so check those bars.
+- Two-voice bars are the hardest part. A missed note or a wrong flag in one voice can shift that bar, so check them in the note list.
 - Lyrics, chord letters, repeats, dynamics and grace notes are ignored.
 - The sound is a simple piano-like tone, not a recording.
 
