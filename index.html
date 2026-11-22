@@ -478,7 +478,18 @@ function readStaff(bin, W, H, st, opt) {
         maxRun = Math.max(maxRun, b2 - a2 + 1);
       }
       if (maxRun > 1.5 * d) return false;
-      const sideInk = Math.max(boxFrac(ii, w, h, c.cx + 0.9 * d, c.cy - 0.5 * d, c.cx + 1.7 * d, c.cy + 0.5 * d), boxFrac(ii, w, h, c.cx - 1.7 * d, c.cy - 0.5 * d, c.cx - 0.9 * d, c.cy + 0.5 * d));
+      // Ink beside the blob counts only when a bar runs on from the blob itself (a beam), not a separate tall sign such as a sharp.
+      const bar = sg => {
+        for (let dy = -0.4; dy <= 0.4; dy += 0.1) {
+          const yy = Math.round(c.cy + dy * d);
+          if (yy < 0 || yy >= h) continue;
+          let ok = true;
+          for (let xx = Math.round(c.cx + sg * 0.7 * d); ok && sg * (xx - (c.cx + sg * 1.5 * d)) <= 0; xx += sg) { if (xx < 0 || xx >= w || !m[yy * w + xx]) ok = false; }
+          if (ok) return true;
+        }
+        return false;
+      };
+      const sideInk = Math.max(bar(1) ? boxFrac(ii, w, h, c.cx + 0.9 * d, c.cy - 0.5 * d, c.cx + 1.7 * d, c.cy + 0.5 * d) : 0, bar(-1) ? boxFrac(ii, w, h, c.cx - 1.7 * d, c.cy - 0.5 * d, c.cx - 0.9 * d, c.cy + 0.5 * d) : 0);
       if (sideInk > 0.3) return false;
     }
     const ry = Math.round(c.cy);
@@ -487,6 +498,18 @@ function readStaff(bin, W, H, st, opt) {
     while (b < w - 1 && m[ry * w + b + 1]) b++;
     return b - a + 1 <= 1.65 * d;
   });
+  // The other head of a hollow chord can sit an odd number of half spaces away (a line note against a space note).
+  for (const c0 of heads.slice()) {
+    if (!c0.hollow) continue;
+    for (const sg of [-1, 1]) {
+      for (const k of [1.5, 2.5, 3.5, 4.5]) {
+        const cy = c0.cy + sg * k * d;
+        const f = boxFrac(ii, w, h, c0.cx - 0.55 * d, cy - 0.38 * d, c0.cx + 0.55 * d, cy + 0.38 * d);
+        const cen = boxFrac(ii, w, h, c0.cx - 0.2 * d, cy - 0.12 * d, c0.cx + 0.2 * d, cy + 0.12 * d);
+        if (f >= 0.45 && f <= 0.8 && cen <= 0.35) if (!heads.some(o => Math.abs(o.cx - c0.cx) < 0.5 * d && Math.abs(o.cy - cy) < 0.5 * d)) heads.push({ cx: c0.cx, cy, hollow: true });
+      }
+    }
+  }
   // Keep only the top note when several heads share a stem position (chords).
   // Heads stacked on one stem form a chord. Every head is kept.
   const single = heads;
@@ -514,7 +537,7 @@ function readStaff(bin, W, H, st, opt) {
     const hasStem = stem.n >= 2.2 * d;
     const hol = grp.some(o => o.hollow);
     if (!hol && !hasStem) return;   // a solid blob with no stem is a beam joint or a mark, not a note
-    let beats;
+    let beats, unsure = false, beamR = false;
     if (hol) beats = hasStem ? 2 : 4;
     else {
       beats = 1;
@@ -549,27 +572,36 @@ function readStaff(bin, W, H, st, opt) {
           }
         }
         let best = 0;
+        { const xr = Math.round(stem.x + 1.15 * d); for (let k = 0; k <= len && !beamR; k++) { const y = ya + inward * k; if (xr >= 0 && xr < w && y >= 0 && y < h && conn.has(y * w + xr)) beamR = true; } }
         for (const side of [1, -1]) {
           // Flags hang on the right of a stem; on the left only a beam, which reaches the next note, counts
           // (a chord letter touching the stem tip would look like a flag).
           if (side < 0) { const xf = Math.round(stem.x - 1.15 * d); let reach = false; for (let k = 0; k <= len && !reach; k++) { const y = ya + inward * k; if (xf >= 0 && y >= 0 && y < h && conn.has(y * w + xf)) reach = true; } if (!reach) continue; }
-          for (const off of [0.45, 0.65, 0.85]) {
+          // Close to the stem the two strokes of a double flag are still apart. Rows on a staff line are skipped
+          // because the line would otherwise split or join strokes.
+          for (const off of [0.25, 0.3, 0.45, 0.65, 0.85]) {
             const x = Math.round(stem.x + side * off * d);
             if (x < 0 || x >= w) continue;
-            let runs = 0, lastInk = -999;
-            const gapMin = Math.max(2, Math.round(0.1 * d));
+            let runs = 0, inInk = false;
             for (let k = 0; k <= len; k++) {
               const y = ya + inward * k;
               if (y < 0 || y >= h) break;
-              if (conn.has(y * w + x)) { if (k - lastInk > gapMin) runs++; lastInk = k; }
+              const rel = (y0 + y - st.top) / d, fr = Math.abs(rel - Math.round(rel));
+              if (rel > -0.2 && rel < 4.2 && fr * d <= 2.2) continue;
+              const ink = conn.has(y * w + x);
+              if (ink && !inInk) runs++;
+              inInk = ink;
             }
             if (runs > best) best = runs;
           }
         }
         // Ink beyond the stem tip (a chord letter or lyric touching the stem) means those "flags" are really text.
-        const oa = dir < 0 ? stem.end - 0.8 * d : stem.end + 0.25 * d, ob = dir < 0 ? stem.end - 0.25 * d : stem.end + 0.8 * d;
+        const oa = dir < 0 ? stem.end - 0.5 * d : stem.end + 0.1 * d, ob = dir < 0 ? stem.end - 0.1 * d : stem.end + 0.5 * d;
         const beyond = Math.max(boxFrac(ii, w, h, stem.x - 0.9 * d, oa, stem.x - 0.15 * d, ob), boxFrac(ii, w, h, stem.x + 0.15 * d, oa, stem.x + 0.9 * d, ob));
-        if (best === 1 && beyond >= 0.15) best = 0;
+        const oa2 = dir < 0 ? stem.end - 1.2 * d : stem.end + 0.15 * d, ob2 = dir < 0 ? stem.end - 0.15 * d : stem.end + 1.2 * d;
+        const beyond2 = Math.max(boxFrac(ii, w, h, stem.x - 1.3 * d, oa2, stem.x - 0.15 * d, ob2), boxFrac(ii, w, h, stem.x + 0.15 * d, oa2, stem.x + 1.3 * d, ob2));
+        unsure = beyond2 >= 0.05;   // something sits near the tip (a chord letter or slur): the flag count is less certain
+        if (beyond >= 0.15) best = 0;   // text touches the tip: take a plain stem and let the bar count correct it if needed
         beats = best >= 2 ? 0.25 : best === 1 ? 0.5 : 1;
       }
     }
@@ -616,7 +648,7 @@ function readStaff(bin, W, H, st, opt) {
     };
     const heads2 = grp.map(o => ({ step: stepOf(o), accid: accidOf(o), cx: o.cx, cy: o.cy })).filter(o => o.step >= -5 && o.step <= 16).sort((p, q) => q.step - p.step);
     const topH = heads2[0];
-    out.push({ step: topH.step, accid: topH.accid, heads: heads2, beats, flexible, baseBeats, dotMul, x: x0 + topH.cx, y: y0 + topH.cy, d, lx: topH.cx, ly: topH.cy, dir: hasStem ? dir : 0, voice });
+    out.push({ step: topH.step, accid: topH.accid, heads: heads2, beats, unsure, beamR, flexible, baseBeats, dotMul, x: x0 + topH.cx, y: y0 + topH.cy, d, lx: topH.cx, ly: topH.cy, dir: hasStem ? dir : 0, voice });
   };
   for (const grp of groups) {
     // Two voices on one staff: an upward stem on the right above, a downward stem on the left below.
@@ -718,7 +750,22 @@ function findBarlines(bin, W, H, st, skip) {
     }
     return best;
   };
-  const good = xs.filter(x => widthAt(x) <= 0.75 * d + 2);
+  // A tie or slur that touches the line makes its whole shape wide, so also accept a line that is wide in only a few rows
+  // (a stem with a head is wide over a quarter of its height).
+  const wideFrac = x => {
+    const cx = x - xa;
+    let wide = 0, tot = 0;
+    for (let y = Math.round(top - y0 + 0.3 * d); y <= Math.round(bot - y0 - 0.3 * d); y++) {
+      tot++;
+      if (!m[y * w + cx]) continue;
+      let a = cx, b = cx;
+      while (a > 0 && m[y * w + a - 1]) a--;
+      while (b < w - 1 && m[y * w + b + 1]) b++;
+      if (b - a + 1 > 0.75 * d + 2) wide++;
+    }
+    return tot ? wide / tot : 1;
+  };
+  const good = xs.filter(x => widthAt(x) <= 0.75 * d + 2 || wideFrac(x) === 0);
   const bars = [];
   for (const x of good) {
     const last = bars[bars.length - 1];
@@ -750,6 +797,10 @@ function fixFlex(ms, target) {
         ch.forEach(c => { base[c.i] = BASE[c.f] * ms[c.i].dotMul; });
         let sc = 0;
         base.forEach((b, i) => { if (b === 0.25 && base[i - 1] !== 0.25 && base[i + 1] !== 0.25) sc += 2; });
+        // Changing a note whose flags could be read with certainty is less likely than changing one with a chord letter or slur at its tip.
+        ch.forEach(c => { if (!ms[c.i].unsure) sc += c.cost; });
+        // A note joined to its neighbour by a beam has its beams counted along the whole bar, so it is the least likely to be wrong.
+        ch.forEach(c => { if (ms[c.i].beamR || (c.i > 0 && ms[c.i - 1].beamR)) sc += 2 * c.cost; });
         if (sc < bestScore) { bestScore = sc; best = ch.slice(); }
         return;
       }
@@ -779,7 +830,7 @@ function fixMeasure(ms, target, keepShort) {
   if (excess < 0.2 && keepShort) return true;
   if (target > 0 && S > target && Math.abs(S / target - Math.round(S / target)) < 0.01) return true;   // a barline was missed: whole bars still add up
   // Bars with sixteenths are more likely to hold a missed flag than a triplet.
-  if (excess > 0.19 && ms.some(n => n.beats === 0.25) && fixFlex(ms, target)) return true;
+  if (excess > 0.19 && fixFlex(ms, target)) return true;
   const wins = [];
   for (let i = 0; i + 2 < ms.length; i++) {
     const b = ms[i].beats;
@@ -917,7 +968,7 @@ function analyzeBinary(bin, W, H, opt) {
         });
         midi = ms[0]; more = ms.slice(1);
       }
-      return { midi, more, rest: !!n.rest, tie: !!n.tie, beats: n.beats, flexible: !!n.flexible, baseBeats: n.baseBeats, dotMul: n.dotMul, voice: n.voice || 0, dir: n.dir || 0, ry: n.rest ? n.y - (st.top + 2 * st.d) : 0, x: n.x, y: n.y, d: n.d, staff: used.length - 1 };
+      return { midi, more, rest: !!n.rest, tie: !!n.tie, beats: n.beats, flexible: !!n.flexible, unsure: !!n.unsure, beamR: !!n.beamR, baseBeats: n.baseBeats, dotMul: n.dotMul, voice: n.voice || 0, dir: n.dir || 0, ry: n.rest ? n.y - (st.top + 2 * st.d) : 0, x: n.x, y: n.y, d: n.d, staff: used.length - 1 };
     });
     // A small "3" over or under a beam marks a triplet: the three notes it sits across last two thirds of what they look like.
     {
@@ -988,6 +1039,22 @@ function analyzeBinary(bin, W, H, opt) {
           if (n.voice) continue;
           if (n.rest) n.voice = n.ry < -0.9 * st.d ? 1 : n.ry > 0.9 * st.d ? 2 : 0;
           else if (!(n.more || []).length) n.voice = n.dir < 0 ? 1 : n.dir > 0 ? 2 : 0;
+        }
+        // A single note drawn with a stem up and a stem down (both voices on the same pitch) was read once: when one voice is short
+        // and the other has a lone note that no note of the short voice sits under, that note belongs to both voices.
+        if (opt.measure) {
+          for (const [a, b] of [[1, 2], [2, 1]]) {
+            const mine = () => ms.filter(n => n.voice !== b), other = ms.filter(n => n.voice === b);
+            const cands = ms.filter(n => n.voice === a && !n.rest && !(n.more || []).length);
+            for (const n of cands) {
+              const have = ms.filter(q => q.voice !== a);
+              const short = opt.measure - have.reduce((t, q) => t + q.beats, 0);
+              const long = opt.measure - ms.filter(q => q.voice !== b).reduce((t, q) => t + q.beats, 0);
+              if (short < 0.2 || Math.abs(long) > 0.2 || n.beats > short + 0.01) continue;
+              if (have.some(q => Math.abs(q.x - n.x) < 0.7 * n.d)) continue;
+              n.voice = 0;
+            }
+          }
         }
         // Each voice must fill the bar on its own; notes that belong to both (single notes, chords, rests) count in both.
         const upper = ms.filter(n => n.voice !== 2), lower = ms.filter(n => n.voice !== 1);
